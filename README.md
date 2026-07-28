@@ -76,8 +76,8 @@ Execution Ledger is a Rust multi-service backend that orchestrates jobs across e
 
 **Component roles:**
 
-- **Tauri Operator**: Desktop console for operators. Manages runs, schedules, and recovery actions. Communicates with API via Rust-backed Tauri commands (no browser CORS dependency). Supports schedule UI, run list/replay, skip/compensate, and recovery workflows.
-- **API**: Accepts job triggers, exposes recovery endpoints. Enqueues intents to Service Bus.
+- **Tauri Operator**: Desktop console for operators. One of several ways to trigger and manage runs, schedules, and recovery actions; not required for normal operation. Communicates with API via Rust-backed Tauri commands (no browser CORS dependency). Supports schedule UI, run list/replay, skip/compensate, and recovery workflows.
+- **API**: Accepts job triggers from the Tauri console, CLI, direct REST/MCP calls, or webhooks (e.g. Drasi/Fabric reactions). Exposes recovery endpoints. Enqueues intents to Service Bus.
 - **Worker**: Dequeues intents from Service Bus (KEDA-scaled 1–10 replicas). Executes connector steps with bounded concurrency. Polling tuned to 5s for sub-10s latency.
 - **Scheduler**: Singleton service. Claims due schedules, enqueues intents to Service Bus. Supports cron/timezone expressions.
 - **Drasi**: WAL reader, singleton. Streams PostgreSQL changes and pushes webhook events for completed/failed jobs. Secondary reactive enqueue path.
@@ -86,11 +86,11 @@ Execution Ledger is a Rust multi-service backend that orchestrates jobs across e
 
 **Data flow:**
 
-1. Operator triggers job via Tauri UI → API enqueues intent to Service Bus
+1. Job triggered via Tauri UI, CLI (`job-launch`), direct API/MCP call, or an inbound webhook → API enqueues intent to Service Bus
 2. Worker dequeues intent → executes connector steps → writes completion to runs/steps table
 3. Drasi reads WAL change → pushes webhook event
-4. Scheduler claims due schedule → enqueues intent to Service Bus
-5. On failure: Operator uses Tauri console to replay, skip, or compensate individual steps
+4. Scheduler claims due schedule → enqueues intent to Service Bus directly, bypassing both the Tauri UI and APIM
+5. On failure: replay, skip, or compensate individual steps via the platform recovery API, called directly, via CLI, or through the Tauri console
 
 ## Repository layout
 
