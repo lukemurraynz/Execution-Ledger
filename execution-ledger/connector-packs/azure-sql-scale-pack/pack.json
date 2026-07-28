@@ -1,0 +1,43 @@
+{
+  "id": "azure-sql-scale-pack",
+  "version": "1.0.0",
+  "description": "Azure SQL Database and Elastic Pool scheduled scaling via execution-ledger. Supports DTU and vCore purchasing models, preserves LicenseType (Hybrid Benefit) across DTU↔vCore switches. MSI auth only — no connection strings.",
+  "connectorKind": "azure_sql",
+  "requiredConfig": [
+    {
+      "name": "AZURE_SUBSCRIPTION_ID",
+      "description": "Azure subscription ID containing the SQL Server and databases"
+    },
+    {
+      "name": "AZURE_RESOURCE_GROUP",
+      "description": "Resource group containing the SQL Server"
+    },
+    {
+      "name": "AZURE_SQL_MI_CLIENT_ID",
+      "description": "Client ID (GUID) of the dedicated UAMI for this pack. Store in App Configuration — never in source control."
+    }
+  ],
+  "requiredRbac": [
+    {
+      "role": "SQL Server Contributor",
+      "scope": "resourceGroup",
+      "description": "Assign to the pack's dedicated UAMI at RG scope — not to a shared worker MSI."
+    },
+    {
+      "role": "Reader",
+      "scope": "resourceGroup",
+      "description": "Assign to the pack's dedicated UAMI for reading SKU and LicenseType before resize."
+    }
+  ],
+  "jobs": [
+    "azure-sql-scale.weekend-scale-down-dtu",
+    "azure-sql-scale.weekend-scale-up-dtu",
+    "azure-sql-scale.metric-reactive-sql-scale-down"
+  ],
+  "connectorActions": [
+    "sql-database-get",
+    "sql-database-resize",
+    "sql-elastic-pool-get",
+    "sql-elastic-pool-resize"
+  ]
+}

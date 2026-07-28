@@ -1,0 +1,22 @@
+{
+  "id": "hello-world.health-and-echo",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "rest-echo",
+      "connector": "rest",
+      "config": {
+        "url": "https://httpbin.org/get",
+        "method": "GET"
+      },
+      "data": {
+        "description": "Validates REST connector configuration by calling a public echo endpoint"
+      }
+    }
+  ]
+}

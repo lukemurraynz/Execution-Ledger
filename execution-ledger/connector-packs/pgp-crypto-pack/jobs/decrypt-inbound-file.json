@@ -1,0 +1,40 @@
+{
+  "id": "pgp-crypto.decrypt-inbound-file",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "download-file",
+      "connector": "sftp",
+      "action": "download",
+      "config": {
+        "remotePath": "/inbox/statement.pgp"
+      },
+      "data": {}
+    },
+    {
+      "id": "decrypt-file",
+      "connector": "pgp",
+      "action": "decrypt",
+      "config": {
+        "partnerPublicKey": "<from Key Vault: EXECUTION_LEDGER_PGP_PARTNER_PUBLIC_KEY>",
+        "privateKey": "<from Key Vault: EXECUTION_LEDGER_PGP_PRIVATE_KEY>",
+        "privateKeyPassphrase": "<from Key Vault: EXECUTION_LEDGER_PGP_PRIVATE_KEY_PASSPHRASE>"
+      },
+      "data": {}
+    },
+    {
+      "id": "store-decrypted-file",
+      "connector": "azure_blob",
+      "config": {
+        "container": "inbound-decrypted",
+        "blobName": "statement.txt"
+      },
+      "data": {}
+    }
+  ]
+}

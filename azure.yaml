@@ -1,0 +1,61 @@
+name: execution-ledger
+infra:
+  provider: bicep
+  path: infra
+
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: .\infra\scripts\Ensure-ProvisionImages.ps1
+
+  postprovision:
+    windows:
+      shell: pwsh
+      run: .\infra\scripts\Add-DeployingUserToAdminGroup.ps1
+
+  predown:
+    windows:
+      shell: pwsh
+      run: .\infra\scripts\Remove-EntraIdentityResources.ps1
+
+services:
+  api:
+    project: execution-ledger
+    host: containerapp
+    language: docker
+    docker:
+      path: crates/execution-ledger-api/Dockerfile
+      context: .
+      remoteBuild: true
+    resourceName: ${AZURE_ENV_NAME}-api
+
+  worker:
+    project: execution-ledger
+    host: containerapp
+    language: docker
+    docker:
+      path: crates/execution-ledger-worker/Dockerfile
+      context: .
+      remoteBuild: true
+    resourceName: ${AZURE_ENV_NAME}-worker
+
+  scheduler:
+    project: execution-ledger
+    host: containerapp
+    language: docker
+    docker:
+      path: crates/execution-ledger-scheduler/Dockerfile
+      context: .
+      remoteBuild: true
+    resourceName: ${AZURE_ENV_NAME}-scheduler
+
+  drasi:
+    project: execution-ledger
+    host: containerapp
+    language: docker
+    docker:
+      path: crates/execution-ledger-drasi/Dockerfile
+      context: .
+      remoteBuild: true
+    resourceName: ${AZURE_ENV_NAME}-drasi

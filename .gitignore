@@ -1,0 +1,13 @@
+/target/
+**/target/
+.env
+.env.local
+*.pdb
+/validation-runs
+infra/main.json
+infra/modules/*.json
+/execution-ledger/artifacts
+/artifacts
+**/.cargo_vcs_info.json
+/.playwright-mcp
+/.sisyphus

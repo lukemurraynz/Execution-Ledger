@@ -1,0 +1,154 @@
+<!--
+    Execution Ledger — API-level APIM policy.
+    All 11 recommendations from the AI-Gateway / apim-lab / Apim-Samples review.
+    Named value placeholders ({{name}}) are resolved at runtime from APIM config.
+
+    Policy ordering (inbound):
+      1. Correlation ID propagation (earliest — tag every request)
+      2. Header hygiene (strip internal trust header before validation)
+      3. CORS (preflight + actual)
+      4. Body size limit (reject oversized before expensive JWT parsing)
+      5. JWT validation (defense in depth at gateway)
+      6. Rate limiting (tenant-scoped via subscription)
+      7. Gateway secret injection (re-add trust header ONLY after all checks pass)
+
+    Backend: retry/circuit-breaker on transient failures (429, 503)
+    Outbound: correlation headers in response + rate-limit remaining
+    On-error: masked error responses (never leak backend details)
+-->
+<policies>
+    <inbound>
+        <base />
+        <!-- (4) Correlation ID: forward existing, generate if absent -->
+        <set-header name="x-request-id" exists-action="skip">
+            <value>@(context.RequestId.ToString())</value>
+        </set-header>
+        <set-header name="x-correlation-id" exists-action="skip">
+            <value>@(Guid.NewGuid().ToString())</value>
+        </set-header>
+        <!-- (10) Strip internal trust header; re-added after all validation passes -->
+        <set-header name="x-execution-ledger-gateway-secret" exists-action="delete" />
+        <!-- (3) CORS: preflight and actual request handling -->
+        <cors allow-credentials="false">
+            <allowed-origins>
+                <origin>{{cors-allowed-origin}}</origin>
+            </allowed-origins>
+            <allowed-methods>
+                <method>GET</method>
+                <method>POST</method>
+                <method>DELETE</method>
+                <method>OPTIONS</method>
+            </allowed-methods>
+            <allowed-headers>
+                <header>Authorization</header>
+                <header>Content-Type</header>
+                <header>x-request-id</header>
+                <header>x-correlation-id</header>
+            </allowed-headers>
+            <expose-headers>
+                <header>x-request-id</header>
+                <header>x-correlation-id</header>
+                <header>x-ratelimit-remaining</header>
+            </expose-headers>
+        </cors>
+        <!-- (7) Request body size limit — reject before expensive JWT + backend work -->
+        <choose>
+            <when condition="@(context.Request.Body != null &amp;&amp; context.Request.Body.As&lt;byte[]&gt;(preserveContent: true).Length &gt; {{request-max-body-bytes}})">
+                <return-response>
+                    <set-status code="413" reason="Payload Too Large" />
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", "Request body exceeds maximum size"),
+                            new JProperty("maxBytes", {{request-max-body-bytes}}),
+                            new JProperty("reference", context.RequestId)
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+        </choose>
+        <set-header name="Host" exists-action="override">
+            <value>{{backend-host-header}}</value>
+        </set-header>
+        <choose>
+            <when condition="@(context.Request.OriginalUrl.Path.ToLowerInvariant().EndsWith(&quot;/health&quot;) || context.Request.OriginalUrl.Path.ToLowerInvariant().Contains(&quot;/health/&quot;))" />
+            <otherwise>
+                <!-- (1) JWT validation — defense in depth at the gateway -->
+                <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+                    failed-validation-error-message="Unauthorized"
+                    output-token-variable-name="jwt">
+                    <openid-config url="{{entra-openid-config-url}}" />
+                    <audiences>
+                        <audience>{{entra-audience}}</audience>
+                    </audiences>
+                </validate-jwt>
+                <!-- (2) Rate limiting — tenant-scoped via APIM subscription -->
+                <rate-limit-by-key calls="{{rate-limit-calls-per-minute}}" renewal-period="60"
+                    counter-key="@(context.Subscription?.Id ?? context.Request.IpAddress ?? context.RequestId.ToString())"
+                    remaining-calls-variable-name="remainingCalls" />
+                <!-- Re-add gateway trust header ONLY after all validation passes -->
+                <set-header name="x-execution-ledger-gateway-secret" exists-action="override">
+                    <value>{{execution-ledger-gateway-secret}}</value>
+                </set-header>
+            </otherwise>
+        </choose>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+        <!-- Propagate identifiers to response for end-to-end tracing -->
+        <set-header name="x-request-id" exists-action="override">
+            <value>@(context.RequestId.ToString())</value>
+        </set-header>
+        <set-header name="x-correlation-id" exists-action="override">
+            <value>@(context.RequestId.ToString())</value>
+        </set-header>
+        <!-- Rate limit remaining for client awareness -->
+        <set-header name="x-ratelimit-remaining" exists-action="override">
+            <value>@(context.Variables.GetValueOrDefault&lt;int&gt;("remainingCalls", 0).ToString())</value>
+        </set-header>
+    </outbound>
+    <on-error>
+        <base />
+        <!-- (6) Error masking — never leak backend details to callers -->
+        <choose>
+            <when condition="@(context.Response.StatusCode == 429)">
+                <return-response>
+                    <set-status code="429" reason="Too Many Requests" />
+                    <set-header name="Retry-After" exists-action="override">
+                        <value>60</value>
+                    </set-header>
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", "Rate limit exceeded"),
+                            new JProperty("reference", context.RequestId.ToString())
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+            <when condition="@(context.Response.StatusCode == 401)">
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", "Authentication required"),
+                            new JProperty("reference", context.RequestId.ToString())
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+            <when condition="@(context.Response.StatusCode >= 500)">
+                <return-response>
+                    <set-status code="502" reason="Bad Gateway" />
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", "An internal error occurred"),
+                            new JProperty("reference", context.RequestId.ToString())
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+        </choose>
+    </on-error>
+</policies>

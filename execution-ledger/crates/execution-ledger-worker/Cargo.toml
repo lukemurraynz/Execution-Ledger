@@ -1,0 +1,24 @@
+[package]
+name = "execution-ledger-worker"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+execution-ledger-core.workspace = true
+execution-ledger-domain.workspace = true
+drasi-lib.workspace = true
+drasi-reaction-http.workspace = true
+drasi-source-postgres.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[lints]
+workspace = true

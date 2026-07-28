@@ -1,0 +1,35 @@
+{
+  "id": "d365-dmf.export-poll",
+  "_comment": "Launch this job on a schedule (e.g. every 2 minutes) rather than calling it once with an in-step retry loop -- see docs/drasi-integration.md. Each launch does exactly one status check.",
+  "steps": [
+    {
+      "id": "check-status",
+      "connector": "erp",
+      "config": {
+        "url": "<EXECUTION_LEDGER_D365_BROKER_URL>"
+      },
+      "data": {
+        "body": {
+          "PartURL": "/data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetExecutionSummaryStatus",
+          "Data": {
+            "executionId": "<supplied via job-launch input: the executionId captured from export-start>"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "object",
+            "properties": {
+              "value": { "enum": ["Succeeded", "PartiallySucceeded"] }
+            },
+            "required": ["value"]
+          }
+        },
+        "required": ["response"]
+      },
+      "_comment": "D365 statuses NotRun/Failed both fail this step's output_schema and therefore this job run -- that IS the intended behavior, not a bug. NotRun means 'not ready yet, the next scheduled tick will check again.' Failed means the export genuinely failed and needs operator attention; distinguish the two by inspecting the schema-validation error text or the raw response logged for this step, since both currently surface as the same SchemaValidation error class."
+    }
+  ]
+}

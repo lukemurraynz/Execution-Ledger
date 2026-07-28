@@ -1,0 +1,31 @@
+{
+  "id": "servicebus-relay.validate-and-forward",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "receive-message",
+      "connector": "queue",
+      "action": "receive",
+      "config": {
+        "queueName": "incoming-messages"
+      },
+      "data": {}
+    },
+    {
+      "id": "forward-to-api",
+      "connector": "rest",
+      "config": {
+        "url": "<downstream-api-endpoint>",
+        "method": "POST"
+      },
+      "data": {
+        "_note": "The received message content is not automatically forwarded here. Template receive-message's 'body' output into this step's data.body for your downstream API's expected shape."
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "azure-compute-scale.emergency-scale-up",
+  "description": "Manual emergency scale-up for ops to invoke during unexpected high load or incident recovery. Invoked via CLI: job-launch <tenant-id> azure-compute-scale.emergency-scale-up '{\"steps\":[...]}'. No schedule — ops-controlled.",
+  "steps": [
+    {
+      "id": "scale-up-vmss",
+      "connector": "azure_compute",
+      "action": "vmss-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod",
+        "targetSku": {
+          "name": "Standard_D16s_v3",
+          "tier": "Standard"
+        },
+        "capacity": {
+          "desiredCapacity": 10
+        }
+      },
+      "data": {
+        "reason": "emergency manual scale-up",
+        "triggeredBy": "ops"
+      }
+    }
+  ]
+}

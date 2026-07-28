@@ -1,0 +1,34 @@
+{
+  "id": "azure-compute-scale",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "Scheduled and metric-reactive Azure compute autoscaling via ARM API. Supports VM, VMSS, and App Service Plan resize with managed identity auth. Designed to replace Bellhop with full idempotency, replay, and audit trail.",
+  "jobs": [
+    "azure-compute-scale.weekend-scale-down",
+    "azure-compute-scale.weekend-scale-up",
+    "azure-compute-scale.metric-reactive-scale-down",
+    "azure-compute-scale.metric-reactive-scale-up",
+    "azure-compute-scale.emergency-scale-up"
+  ],
+  "connectorActions": [
+    "vm-get",
+    "vm-save-state",
+    "vmss-get",
+    "vmss-resize",
+    "appservice-get",
+    "appservice-resize"
+  ],
+  "requiredConfig": {
+    "azure_compute": [
+      "AZURE_SUBSCRIPTION_ID",
+      "AZURE_RESOURCE_GROUP",
+      "AZURE_COMPUTE_MI_CLIENT_ID"
+    ]
+  },
+  "notes": [
+    "Managed identity only — connection strings and API keys are not supported.",
+    "Use a dedicated UAMI for this pack with 'Virtual Machine Scale Set Contributor' + 'Reader' on the target RG. See runbook.md for setup steps.",
+    "AZURE_COMPUTE_MI_CLIENT_ID is the client ID (GUID) of the pack's user-assigned MSI, stored in App Configuration. Do NOT use a shared worker MSI in production.",
+    "Cron schedules are set in execution-ledger-scheduler; Drasi continuous queries drive reactive overrides."
+  ]
+}

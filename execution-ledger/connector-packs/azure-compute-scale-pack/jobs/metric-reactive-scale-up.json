@@ -1,0 +1,27 @@
+{
+  "id": "azure-compute-scale.metric-reactive-scale-up",
+  "description": "Scales VMSS up when application signals indicate elevated load. Triggered by Drasi continuous query watching Event Hub — e.g., queue_depth > 50 for 5 minutes, or active_connections > 80% of capacity. See docs/drasi-sources.md.",
+  "steps": [
+    {
+      "id": "scale-up-vmss",
+      "connector": "azure_compute",
+      "action": "vmss-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod",
+        "targetSku": {
+          "name": "Standard_D8s_v3",
+          "tier": "Standard"
+        },
+        "capacity": {
+          "desiredCapacity": 5
+        }
+      },
+      "data": {
+        "reason": "metric-reactive scale-up — queue_depth > 50 for 5 consecutive minutes",
+        "triggeredBy": "drasi-event-hub"
+      }
+    }
+  ]
+}

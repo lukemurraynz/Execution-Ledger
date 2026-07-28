@@ -1,0 +1,27 @@
+{
+  "id": "azure-compute-scale.weekend-scale-up",
+  "description": "Scales VMSS back to production SKU on Monday morning. Use with a cron schedule of '0 7 * * 1' (Monday 7am) in execution-ledger-scheduler.",
+  "steps": [
+    {
+      "id": "scale-up-vmss",
+      "connector": "azure_compute",
+      "action": "vmss-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod",
+        "targetSku": {
+          "name": "Standard_D8s_v3",
+          "tier": "Standard"
+        },
+        "capacity": {
+          "desiredCapacity": 3
+        }
+      },
+      "data": {
+        "reason": "weekday scale-up",
+        "scheduledBy": "cron"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "jobId": "helpdesk.ticket.escalate",
+  "data": {
+    "sourceSystem": "foundry-helpdesk-agent",
+    "targetSystem": "ticket-worker",
+    "metadata": {
+      "packId": "itsm-helpdesk-pack",
+      "domain": "itsm",
+      "scenario": "ticket-escalation"
+    },
+    "steps": [
+      {
+        "id": "invoke-foundry-agent",
+        "connector": "rest",
+        "externalId": "foundry-agent-escalation",
+        "data": {
+          "method": "POST",
+          "body": {
+            "action": "invoke_agent",
+            "conversationId": "${CONVERSATION_ID}",
+            "message": "${USER_MESSAGE}",
+            "escalationContext": {
+              "reason": "agent_determined_human_needed",
+              "category": "${ESCALATION_CATEGORY}"
+            }
+          }
+        },
+        "config": {
+          "url": "${EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT}/agents/${EXECUTION_LEDGER_FOUNDRY_AGENT_ID}/invoke",
+          "method": "POST",
+          "timeoutMs": 60000
+        },
+        "_configNote": "Foundry agent endpoint. The agent's create_ticket function tool returns a ticket ID when escalation is triggered."
+      },
+      {
+        "id": "publish-escalation-event",
+        "connector": "queue",
+        "externalId": "ticket-escalation-events",
+        "data": {
+          "priority": "high",
+          "body": {
+            "ticketId": "${TICKET_ID}",
+            "conversationId": "${CONVERSATION_ID}",
+            "title": "${TICKET_TITLE}",
+            "description": "${TICKET_DESCRIPTION}",
+            "priority": "${TICKET_PRIORITY:-high}",
+            "category": "${ESCALATION_CATEGORY}",
+            "escalatedAt": "${TIMESTAMP}"
+          }
+        },
+        "config": {
+          "provider": "servicebus",
+          "queueName": "ticket-worker",
+          "namespace": "${EXECUTION_LEDGER_SERVICEBUS_NAMESPACE}"
+        },
+        "_configNote": "Service Bus queue consumed by the ticket worker. Managed identity must have 'Azure Service Bus Data Sender' role on the namespace."
+      },
+      {
+        "id": "acknowledge-escalation",
+        "connector": "rest",
+        "externalId": "escalation-ack",
+        "data": {
+          "method": "POST",
+          "body": {
+            "action": "acknowledge_escalation",
+            "ticketId": "${TICKET_ID}",
+            "conversationId": "${CONVERSATION_ID}",
+            "status": "Escalated",
+            "message": "Your issue has been escalated to the IT helpdesk team. You will receive an update shortly."
+          }
+        },
+        "config": {
+          "url": "${EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT}/agents/${EXECUTION_LEDGER_FOUNDRY_AGENT_ID}/conversations/${CONVERSATION_ID}/messages",
+          "method": "POST",
+          "timeoutMs": 30000
+        },
+        "_configNote": "Sends a follow-up message to the user's Foundry conversation confirming escalation."
+      }
+    ]
+  }
+}

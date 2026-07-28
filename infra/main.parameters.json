@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "tags": {
+      "value": {
+        "azd-env-name": "${AZURE_ENV_NAME}",
+        "app": "execution-ledger"
+      }
+    },
+    "apiImageName": {
+      "value": "${SERVICE_API_IMAGE_NAME}"
+    },
+    "workerImageName": {
+      "value": "${SERVICE_WORKER_IMAGE_NAME}"
+    },
+    "schedulerImageName": {
+      "value": "${SERVICE_SCHEDULER_IMAGE_NAME}"
+    },
+    "postgresAdminLogin": {
+      "value": "${POSTGRES_ADMIN_LOGIN}"
+    },
+    "postgresAdminPassword": {
+      "value": "${POSTGRES_ADMIN_PASSWORD}"
+    },
+    "postgresDatabaseName": {
+      "value": "${POSTGRES_DATABASE_NAME}"
+    },
+    "entraAudience": {
+      "value": "${EXECUTION_LEDGER_ENTRA_AUDIENCE=}"
+    },
+    "workerWebhookUrl": {
+      "value": "${EXECUTION_LEDGER_WORKER_WEBHOOK_URL}"
+    },
+    "apimGatewaySecret": {
+      "value": "${EXECUTION_LEDGER_APIM_GATEWAY_SECRET}"
+    },
+    "apimPublisherName": {
+      "value": "${EXECUTION_LEDGER_APIM_PUBLISHER_NAME}"
+    },
+    "apimPublisherEmail": {
+      "value": "${EXECUTION_LEDGER_APIM_PUBLISHER_EMAIL}"
+    },
+    "mcpResourceUrl": {
+      "value": "${EXECUTION_LEDGER_MCP_RESOURCE_URL}"
+    },
+    "mcpAuthorizationServers": {
+      "value": "${EXECUTION_LEDGER_MCP_AUTHORIZATION_SERVERS}"
+    },
+    "offloadInlineMaxBytes": {
+      "value": "${EXECUTION_LEDGER_OFFLOAD_INLINE_MAX_BYTES}"
+    },
+    "queueEngine": {
+      "value": "servicebus"
+    },
+    "runtimeDatabaseCredentialMode": {
+      "value": "${EXECUTION_LEDGER_DB_CREDENTIAL_MODE=app}"
+    },
+    "appConfigSeedMode": {
+      "value": "${EXECUTION_LEDGER_APPCONFIG_SEED_MODE=template}"
+    },
+    "apimDeploymentMode": {
+      "value": "${EXECUTION_LEDGER_APIM_DEPLOYMENT_MODE=enabled}"
+    },
+    "apimEntraTenantId": {
+      "value": "${EXECUTION_LEDGER_APIM_ENTRA_TENANT_ID=common}"
+    },
+    "apimCorsAllowedOrigin": {
+      "value": "${EXECUTION_LEDGER_APIM_CORS_ORIGIN=*}"
+    },
+    "apimRateLimitCallsPerMinute": {
+      "value": "${EXECUTION_LEDGER_APIM_RATE_LIMIT=100}"
+    },
+    "apimRequestMaxBodyBytes": {
+      "value": "${EXECUTION_LEDGER_APIM_MAX_BODY_BYTES=1048576}"
+    }
+  }
+}

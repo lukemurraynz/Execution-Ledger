@@ -1,0 +1,68 @@
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/workspace/target
+    command: sleep infinity
+    environment:
+      # Matches execution-ledger-core::config::ExecutionLedgerConfig::from_env — same variable
+      # names the TS system used (docs/environment-variables.md), pointed at
+      # the postgres service below.
+      EXECUTION_LEDGER_DATABASE_URL: postgres://execution_ledger:atlas@postgres:5432/execution_ledger
+      EXECUTION_LEDGER_ENV: devcontainer
+      # execution-ledger-api requires this; there is no default/mock fallback.
+      # Keep it unset here so azd provisioning can generate and persist the
+      # environment-specific audience value.
+      # Set it manually before running execution-ledger-api locally.
+      # Only enforced when set — leave unset for local/devcontainer use since
+      # there's no APIM in front here.
+      # EXECUTION_LEDGER_APIM_GATEWAY_SECRET: ""
+      # execution-ledger-worker requires this; there is no default/mock fallback.
+      # Point it at a real endpoint (e.g. a local receiver, or
+      # https://webhook.site/<id> for manual verification) before running
+      # execution-ledger-worker inside the container.
+      EXECUTION_LEDGER_WORKER_WEBHOOK_URL: http://localhost:9000/changes
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    # intentionally track latest for fresh deployments only.
+    image: postgres:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: execution_ledger
+      POSTGRES_PASSWORD: execution_ledger
+      POSTGRES_DB: execution_ledger
+    # wal_level=logical (and the slot/sender minimums) are the real
+    # prerequisite drasi-source-postgres needs for logical replication —
+    # the same setting Azure Database for PostgreSQL Flexible Server
+    # requires via a server-parameter change; see
+    # docs/azure-postgres-logical-replication.md for the Azure equivalent.
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=4
+      - -c
+      - max_wal_senders=4
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      start_period: 20s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
+  cargo-registry:
+  cargo-target:

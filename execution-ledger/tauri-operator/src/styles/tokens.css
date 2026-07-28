@@ -1,0 +1,125 @@
+:root {
+  /* Typography */
+  --el-font-family-base: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  --el-font-family-display: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  --el-font-family-mono: "Cascadia Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+  /* Brand accent */
+  --el-color-brand: #6c4ce6;
+  --el-color-brand-hover: #7e5fef;
+  --el-color-brand-light: #8b6ef5;
+  --el-color-brand-subtle: rgba(108, 76, 230, 0.08);
+  --el-color-brand-glow: rgba(108, 76, 230, 0.12);
+
+  /* Neutral backgrounds — light palette */
+  --el-color-bg-canvas: #f5f6f8;
+  --el-color-bg-surface: #ffffff;
+  --el-color-bg-elevated: #f1f3f5;
+  --el-color-bg-raised: #e9ecef;
+  --el-color-bg-overlay: rgba(0, 0, 0, 0.3);
+  --el-color-bg-danger: rgba(239, 68, 68, 0.06);
+
+  /* Borders */
+  --el-color-border-subtle: rgba(0, 0, 0, 0.06);
+  --el-color-border-default: rgba(0, 0, 0, 0.10);
+  --el-color-border-strong: rgba(0, 0, 0, 0.16);
+  --el-color-border-focus: rgba(108, 76, 230, 0.45);
+  --el-color-border-danger: rgba(239, 68, 68, 0.30);
+
+  /* Text */
+  --el-color-text-primary: #1a1a2e;
+  --el-color-text-secondary: #495057;
+  --el-color-text-heading: #0d0d12;
+  --el-color-text-muted: #868e96;
+  --el-color-text-inverse: #ffffff;
+
+  /* Status */
+  --el-color-success: #16a34a;
+  --el-color-success-bg: rgba(22, 163, 74, 0.08);
+  --el-color-success-border: rgba(22, 163, 74, 0.25);
+  --el-color-warning: #d97706;
+  --el-color-warning-bg: rgba(217, 119, 6, 0.08);
+  --el-color-warning-border: rgba(217, 119, 6, 0.25);
+  --el-color-danger: #dc2626;
+  --el-color-danger-bg: rgba(220, 38, 38, 0.06);
+  --el-color-danger-border: rgba(220, 38, 38, 0.25);
+  --el-color-info: #2563eb;
+  --el-color-info-bg: rgba(37, 99, 235, 0.06);
+  --el-color-info-border: rgba(37, 99, 235, 0.25);
+
+  /* Spacing */
+  --el-space-1: 4px;
+  --el-space-2: 8px;
+  --el-space-3: 12px;
+  --el-space-4: 16px;
+  --el-space-5: 20px;
+  --el-space-6: 24px;
+  --el-space-8: 32px;
+  --el-space-10: 40px;
+  --el-space-12: 48px;
+
+  /* Radii */
+  --el-radius-sm: 6px;
+  --el-radius-md: 8px;
+  --el-radius-lg: 12px;
+  --el-radius-xl: 16px;
+  --el-radius-pill: 999px;
+
+  /* Shadows */
+  --el-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --el-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --el-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --el-shadow-glow: 0 0 20px var(--el-color-brand-glow);
+
+  /* Transitions */
+  --el-transition-fast: 120ms ease;
+  --el-transition-normal: 200ms ease;
+  --el-transition-slow: 300ms ease;
+
+  /* Sidebar */
+  --el-sidebar-width: 280px;
+}
+
+/* ── Dark theme overrides ── */
+[data-theme="dark"] {
+  --el-color-brand: #7c5cfc;
+  --el-color-brand-hover: #916efd;
+  --el-color-brand-light: #a78bfa;
+  --el-color-brand-subtle: rgba(124, 92, 252, 0.12);
+  --el-color-brand-glow: rgba(124, 92, 252, 0.20);
+
+  --el-color-bg-canvas: #111318;
+  --el-color-bg-surface: #1a1d24;
+  --el-color-bg-elevated: #22262e;
+  --el-color-bg-raised: #2a2f38;
+  --el-color-bg-overlay: rgba(0, 0, 0, 0.55);
+  --el-color-bg-danger: rgba(239, 68, 68, 0.08);
+
+  --el-color-border-subtle: rgba(255, 255, 255, 0.07);
+  --el-color-border-default: rgba(255, 255, 255, 0.12);
+  --el-color-border-strong: rgba(255, 255, 255, 0.20);
+  --el-color-border-focus: rgba(124, 92, 252, 0.45);
+
+  --el-color-text-primary: #e8eaed;
+  --el-color-text-secondary: #b0b5bc;
+  --el-color-text-heading: #f1f3f5;
+  --el-color-text-muted: #8b919a;
+  --el-color-text-inverse: #111318;
+
+  --el-color-success: #34d399;
+  --el-color-success-bg: rgba(52, 211, 153, 0.10);
+  --el-color-success-border: rgba(52, 211, 153, 0.25);
+  --el-color-warning: #fbbf24;
+  --el-color-warning-bg: rgba(251, 191, 36, 0.10);
+  --el-color-warning-border: rgba(251, 191, 36, 0.25);
+  --el-color-danger: #f87171;
+  --el-color-danger-bg: rgba(248, 113, 113, 0.10);
+  --el-color-danger-border: rgba(248, 113, 113, 0.25);
+  --el-color-info: #60a5fa;
+  --el-color-info-bg: rgba(96, 165, 250, 0.10);
+  --el-color-info-border: rgba(96, 165, 250, 0.25);
+
+  --el-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --el-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --el-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
+}

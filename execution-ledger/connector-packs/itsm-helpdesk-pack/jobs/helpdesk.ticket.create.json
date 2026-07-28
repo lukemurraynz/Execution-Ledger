@@ -1,0 +1,105 @@
+{
+  "jobId": "helpdesk.ticket.create",
+  "data": {
+    "sourceSystem": "foundry-helpdesk-agent",
+    "targetSystem": "teams-helpdesk-channel",
+    "metadata": {
+      "packId": "itsm-helpdesk-pack",
+      "domain": "itsm",
+      "scenario": "ticket-create"
+    },
+    "steps": [
+      {
+        "id": "invoke-foundry-agent",
+        "connector": "rest",
+        "externalId": "foundry-agent-conversation",
+        "data": {
+          "method": "POST",
+          "body": {
+            "action": "invoke_agent",
+            "conversationId": "${CONVERSATION_ID}",
+            "message": "${USER_MESSAGE}"
+          }
+        },
+        "config": {
+          "url": "${EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT}/agents/${EXECUTION_LEDGER_FOUNDRY_AGENT_ID}/invoke",
+          "method": "POST",
+          "timeoutMs": 60000
+        },
+        "_configNote": "Foundry agent endpoint. Managed identity must have the custom Foundry agent-runtime role (endpoints/interact/action + agents/read + agents/write)."
+      },
+      {
+        "id": "persist-ticket-record",
+        "connector": "rest",
+        "externalId": "ticket-storage-write",
+        "data": {
+          "method": "POST",
+          "body": {
+            "action": "create_ticket",
+            "ticketId": "${TICKET_ID}",
+            "conversationId": "${CONVERSATION_ID}",
+            "title": "${TICKET_TITLE}",
+            "description": "${TICKET_DESCRIPTION}",
+            "priority": "${TICKET_PRIORITY:-medium}",
+            "status": "New",
+            "createdAt": "${TIMESTAMP}"
+          }
+        },
+        "config": {
+          "url": "${EXECUTION_LEDGER_TICKET_STORAGE_URL}",
+          "method": "POST",
+          "timeoutMs": 15000
+        },
+        "_configNote": "Ticket persistence endpoint (Table Storage or equivalent). Worker UAMI must have Storage Table Data Contributor role."
+      },
+      {
+        "id": "notify-teams-channel",
+        "connector": "rest",
+        "externalId": "teams-adaptive-card",
+        "data": {
+          "method": "POST",
+          "body": {
+            "type": "message",
+            "attachments": [
+              {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                  "type": "AdaptiveCard",
+                  "version": "1.4",
+                  "body": [
+                    {
+                      "type": "TextBlock",
+                      "text": "New IT Ticket Created",
+                      "weight": "Bolder",
+                      "size": "Medium"
+                    },
+                    {
+                      "type": "FactSet",
+                      "facts": [
+                        { "title": "Ticket ID", "value": "${TICKET_ID}" },
+                        { "title": "Priority", "value": "${TICKET_PRIORITY:-medium}" },
+                        { "title": "Status", "value": "New" }
+                      ]
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": "${TICKET_DESCRIPTION}",
+                      "wrap": true
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "config": {
+          "url": "${EXECUTION_LEDGER_TEAMS_WEBHOOK_URL}",
+          "method": "POST",
+          "timeoutMs": 15000
+        },
+        "_configNote": "Power Automate HTTP-triggered flow webhook. Store URL in Key Vault — it's the only unavoidable secret."
+      }
+    ]
+  }
+}

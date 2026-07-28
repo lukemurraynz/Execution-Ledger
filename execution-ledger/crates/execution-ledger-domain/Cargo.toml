@@ -1,0 +1,34 @@
+[package]
+name = "execution-ledger-domain"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+execution-ledger-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+ssh2 = "0.9"
+base64.workspace = true
+azure_storage_blob.workspace = true
+azure_core.workspace = true
+azure_identity.workspace = true
+jsonschema.workspace = true
+pgp.workspace = true
+zip.workspace = true
+# Pinned to 0.8 (not workspace-inherited): the `pgp` crate's public API
+# (MessageBuilder::seipd_v1/encrypt_to_key/generate, etc.) is generic over
+# `RAND: rand::Rng + rand::CryptoRng` resolved against rand 0.8.6, its own
+# pinned internal dependency. A caller-supplied RNG from a different major
+# rand version doesn't satisfy those trait bounds (different crate = different
+# trait, even with an identical name), so this must track whatever `pgp`
+# itself depends on, independent of the workspace-wide rand version.
+rand = "0.8"
+
+[lints]
+workspace = true

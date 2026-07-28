@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "kill_switch": {
+    "enabled": true,
+    "fail_closed": true
+  },
+  "gates": {
+    "error_budget": {
+      "max_failure_rate": 0.02,
+      "max_burn_rate_1h": 2.0,
+      "max_burn_rate_6h": 1.0,
+      "min_request_count": 100
+    },
+    "queue_lag": {
+      "max_intent_queue_lag_p95_seconds": 120,
+      "max_intent_queue_oldest_message_seconds": 300
+    },
+    "crash_loop": {
+      "max_total_restarts_in_window": 3,
+      "max_restarts_per_service": 2
+    },
+    "security_policy": {
+      "allowed_api_auth_modes": [
+        "managed_identity"
+      ],
+      "allowed_servicebus_auth_modes": [
+        "managed_identity"
+      ],
+      "max_secret_resolution_failures": 0,
+      "max_missing_required_secrets": 0
+    },
+    "slo_minimums": {
+      "critical_paths": [
+        {
+          "name": "platform_jobs_trigger_success_ratio",
+          "metric_path": "slos.platform_jobs_trigger_success_ratio",
+          "min_value": 0.995
+        },
+        {
+          "name": "platform_jobs_list_success_ratio",
+          "metric_path": "slos.platform_jobs_list_success_ratio",
+          "min_value": 0.995
+        },
+        {
+          "name": "mcp_tool_call_success_ratio",
+          "metric_path": "slos.mcp_tool_call_success_ratio",
+          "min_value": 0.995
+        }
+      ],
+      "latency_paths": [
+        {
+          "name": "platform_jobs_trigger_latency_p95_ms",
+          "metric_path": "slos.platform_jobs_trigger_latency_p95_ms",
+          "max_value": 1200
+        }
+      ]
+    }
+  }
+}

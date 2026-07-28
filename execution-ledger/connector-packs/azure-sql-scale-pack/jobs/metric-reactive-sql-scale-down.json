@@ -1,0 +1,45 @@
+{
+  "id": "azure-sql-scale.metric-reactive-sql-scale-down",
+  "description": "Scales down idle SQL Databases when DTU utilization has been below threshold for a sustained window. Triggered by Drasi continuous query watching Event Hub (Azure Monitor alerts). See docs/drasi-sources.md for pipeline. Preserves LicenseType (Hybrid Benefit) in state capture step.",
+  "trigger": "drasi",
+  "steps": [
+    {
+      "id": "capture-db-state",
+      "connector": "azure_sql",
+      "action": "sql-database-get",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "serverName": "${SQL_SERVER_NAME}",
+        "databaseName": "${SQL_DATABASE_NAME}"
+      },
+      "data": {
+        "reason": "metric-reactive scale-down state capture",
+        "triggeredBy": "drasi-event-hub"
+      }
+    },
+    {
+      "id": "scale-down-db",
+      "connector": "azure_sql",
+      "action": "sql-database-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "serverName": "${SQL_SERVER_NAME}",
+        "databaseName": "${SQL_DATABASE_NAME}",
+        "targetSku": {
+          "name": "S0",
+          "tier": "Standard",
+          "capacity": 10
+        }
+      },
+      "data": {
+        "reason": "DTU < 5% sustained 30 min — cost optimization scale-down",
+        "triggeredBy": "drasi-event-hub",
+        "previousSku": "${step.capture-db-state.output.currentSku}",
+        "previousLicenseType": "${step.capture-db-state.output.licenseType}",
+        "licenseType": "${step.capture-db-state.output.licenseType}"
+      }
+    }
+  ]
+}

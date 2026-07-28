@@ -1,0 +1,11 @@
+{
+  "id": "rest-webhook",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "REST webhook pattern: call an external API, persist the response, and handle retry/compensation on failure with idempotent delivery.",
+  "jobs": ["rest-webhook.call-and-persist"],
+  "requiredConfig": {},
+  "notes": [
+    "No connector-specific configuration required. Replace the example URL with your actual webhook target."
+  ]
+}

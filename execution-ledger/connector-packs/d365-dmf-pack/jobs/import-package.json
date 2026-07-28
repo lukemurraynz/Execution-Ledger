@@ -1,0 +1,76 @@
+{
+  "id": "d365-dmf.import-package",
+  "_comment": "Unlike export, D365 import of a small package is synchronous enough to run as one job -- no separate poll job. If your import volume needs async status polling too, mirror export-poll's pattern (see docs/drasi-integration.md) rather than adding a blocking loop here.",
+  "steps": [
+    {
+      "id": "get-write-url",
+      "connector": "erp",
+      "config": {
+        "url": "<EXECUTION_LEDGER_D365_BROKER_URL>"
+      },
+      "data": {
+        "body": {
+          "PartURL": "/data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetAzureWriteUrl",
+          "Data": {
+            "definitionGroupId": "<dmf-package-name>",
+            "uniqueFileName": "<dmf-package-name>.zip"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "object",
+            "properties": { "value": { "type": "string" } },
+            "required": ["value"]
+          }
+        },
+        "required": ["response"]
+      }
+    },
+    {
+      "id": "zip-package",
+      "connector": "blob_archive",
+      "action": "zip",
+      "config": {
+        "sourceContainer": "dmf-import-staging",
+        "sourceBlobNames": ["<file-1.csv>", "<file-2.csv>"],
+        "destinationContainer": "dmf-import-archive",
+        "destinationBlobName": "<dmf-package-name>.zip"
+      },
+      "data": {},
+      "_comment": "sourceBlobNames is an explicit list, not a live container listing -- see blob_archive's module doc for why. This step's output also carries the archive as base64 content for upload-package below."
+    },
+    {
+      "id": "upload-package",
+      "connector": "http_download",
+      "action": "upload",
+      "config": {
+        "url": "<carried forward from get-write-url's response.value -- see runbook>"
+      },
+      "data": {},
+      "_comment": "Reads zip-package's base64 output automatically (it's the immediately preceding step). url must be supplied here explicitly since get-write-url is two steps back, not one -- there is no fan-out/multi-step-back lookup in this platform's data flow model."
+    },
+    {
+      "id": "import-package",
+      "connector": "erp",
+      "config": {
+        "url": "<EXECUTION_LEDGER_D365_BROKER_URL>"
+      },
+      "data": {
+        "body": {
+          "PartURL": "/data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.ImportFromPackage",
+          "Data": {
+            "definitionGroupId": "<dmf-package-name>",
+            "packageUrl": "<same writable URL used in upload-package>",
+            "executionId": "",
+            "execute": "true",
+            "overwrite": "true",
+            "legalEntityId": "<legal-entity-id>"
+          }
+        }
+      }
+    }
+  ]
+}

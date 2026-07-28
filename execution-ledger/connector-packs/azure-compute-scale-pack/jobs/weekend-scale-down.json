@@ -1,0 +1,27 @@
+{
+  "id": "azure-compute-scale.weekend-scale-down",
+  "description": "Scales down VMSS to a cheaper SKU on Friday evening. Use with a cron schedule of '0 20 * * 5' (Friday 8pm) in execution-ledger-scheduler.",
+  "steps": [
+    {
+      "id": "scale-down-vmss",
+      "connector": "azure_compute",
+      "action": "vmss-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod",
+        "targetSku": {
+          "name": "Standard_D2s_v3",
+          "tier": "Standard"
+        },
+        "capacity": {
+          "desiredCapacity": 1
+        }
+      },
+      "data": {
+        "reason": "weekend scale-down",
+        "scheduledBy": "cron"
+      }
+    }
+  ]
+}

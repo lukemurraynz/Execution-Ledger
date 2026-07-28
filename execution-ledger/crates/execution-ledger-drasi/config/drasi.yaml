@@ -1,0 +1,155 @@
+# Drasi source, query, and reaction configuration for Execution Ledger.
+#
+# Secrets (host, port, user, password, database) are resolved at runtime
+# from EXECUTION_LEDGER_DATABASE_URL via Key Vault -> App Configuration.
+# The webhook URL comes from EXECUTION_LEDGER_WORKER_WEBHOOK_URL.
+#
+# Override path with EXECUTION_LEDGER_DRASI_CONFIG_PATH env var.
+#
+# Phase 1 expansion (2026-07-26): added step-failure, stale-run,
+# tenant-change, schedule-misfire, and queue-backlog queries.
+# All use existing webhook reaction — no new endpoints needed.
+
+sources:
+  - id: execution-ledger-job-runs
+    tables:
+      - EXECUTION_LEDGER_jobs_runs
+      - EXECUTION_LEDGER_steps_runs
+      - EXECUTION_LEDGER_tenants
+      - EXECUTION_LEDGER_schedules
+      - EXECUTION_LEDGER_local_intent_queue
+    slot_name: execution_ledger_worker_slot
+    publication_name: execution_ledger_worker_publication
+    ssl_mode: require
+
+queries:
+  # ── Original queries (unchanged) ──────────────────────────────────────────
+
+  - id: completed-job-runs
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (r:EXECUTION_LEDGER_jobs_runs)
+      WHERE r.status = 'completed' OR r.status = 'failed'
+      RETURN r.id, r.job_id, r.status, r.completed_at, r.tenant_id,
+             r.correlation_id, r.current_attempt, r.max_attempts, r.last_error
+
+  - id: due-schedules
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (s:EXECUTION_LEDGER_schedules)
+      WHERE s.next_run <= datetime() AND s.status = 'ACTIVE'
+      RETURN s.scheduler_id, s.job_id, s.tenant_id, s.cron_expression,
+             s.next_run, s.parameters
+
+  # ── Phase 1: Operational-awareness queries ────────────────────────────────
+
+  - id: step-failure-burst
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (step:EXECUTION_LEDGER_steps_runs)
+      WHERE step.status = 'failed'
+      RETURN step.id, step.job_run_id, step.step_id, step.correlation_id,
+             step.error, step.attempt, step.created_at
+    # Purpose: detect step-level failures as they happen — every failed step
+    # emits a webhook event. Downstream consumers (SRE Agent, Fabric Activator,
+    # PagerDuty) can aggregate and alert on bursts.
+
+  - id: stale-runs
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (r:EXECUTION_LEDGER_jobs_runs)
+      WHERE r.status = 'running'
+        AND r.started_at IS NOT NULL
+        AND r.started_at < datetime() - duration('PT30M')
+      RETURN r.id, r.job_id, r.tenant_id, r.correlation_id,
+             r.started_at, r.current_attempt, r.max_attempts,
+             r.lease_owner, r.lease_expires_at
+    # Purpose: detect runs that have been "running" for > 30 minutes.
+    # These are likely stuck (worker crashed mid-execution, lost lease).
+    # Downstream consumer triggers /platform/recovery/runs to release leases.
+
+  - id: tenant-state-change
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (t:EXECUTION_LEDGER_tenants)
+      RETURN t.id, t.name, t.status, t.created_at
+    # Purpose: detect when a tenant's status changes (active → disabled,
+    # or a new tenant is created). Downstream consumer triggers tenant
+    # lifecycle jobs (provisioning, deprovisioning, access review).
+    # Note: Drasi emits events for INSERT and UPDATE. The downstream
+    # consumer should diff old/new status to determine the action.
+
+  - id: schedule-misfires
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (s:EXECUTION_LEDGER_schedules)
+      WHERE s.status = 'ACTIVE'
+        AND s.last_run_at IS NOT NULL
+        AND s.next_run < datetime()
+        AND s.next_run > s.last_run_at
+      RETURN s.scheduler_id, s.job_id, s.cron_expression, s.next_run,
+             s.last_run_at, s.lease_until, s.lease_owner, s.last_error
+    # Purpose: detect schedules whose next_run has passed but haven't
+    # fired (misfire). The condition ensures we only catch schedules
+    # that have a meaningful last_run reference point.
+    # Downstream consumer triggers /platform/recovery/schedules.
+
+  - id: queue-backlog
+    source: execution-ledger-job-runs
+    cypher: |
+      MATCH (q:EXECUTION_LEDGER_local_intent_queue)
+      WHERE q.dead_lettered_at IS NULL
+        AND q.available_at <= datetime()
+        AND q.lease_until IS NULL
+      RETURN q.id, q.queue_name, q.intent_id, q.attempts,
+             q.available_at, q.created_at
+    # Purpose: detect backlog in the local intent queue. Messages sitting
+    # unclaimed past their available_at time indicate either worker
+    # starvation or processing slowdown.
+    # Downstream consumer can trigger worker scale-out or alert.
+
+reactions:
+  # ── Original reactions (unchanged) ────────────────────────────────────────
+
+  - id: job-run-webhook
+    query: completed-job-runs
+    timeout_ms: 5000
+
+  - id: schedule-enqueue
+    query: due-schedules
+    timeout_ms: 5000
+    base_url: ${EXECUTION_LEDGER_API_INTERNAL_URL}
+    token: ${EXECUTION_LEDGER_APIM_GATEWAY_SECRET}
+
+  # ── Phase 1: Operational-awareness reactions ──────────────────────────────
+  #
+  # All new reactions use the same webhook URL as job-run-webhook.
+  # The webhook consumer distinguishes events by the query ID embedded
+  # in the Drasi change-event payload. No new API endpoints needed.
+  #
+  # To consume these events, add query-ID routing in your webhook handler:
+  #   if change.query_id == "step-failure-burst" → aggregate + alert
+  #   if change.query_id == "stale-runs" → trigger /platform/recovery/runs
+  #   if change.query_id == "tenant-state-change" → trigger lifecycle job
+  #   if change.query_id == "schedule-misfires" → trigger /platform/recovery/schedules
+  #   if change.query_id == "queue-backlog" → trigger scale-out or alert
+
+  - id: step-failure-webhook
+    query: step-failure-burst
+    timeout_ms: 5000
+
+  - id: stale-run-webhook
+    query: stale-runs
+    timeout_ms: 5000
+
+  - id: tenant-change-webhook
+    query: tenant-state-change
+    timeout_ms: 5000
+
+  - id: schedule-misfire-webhook
+    query: schedule-misfires
+    timeout_ms: 5000
+
+  - id: queue-backlog-webhook
+    query: queue-backlog
+    timeout_ms: 10000

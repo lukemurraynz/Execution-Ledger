@@ -1,0 +1,14 @@
+{
+  "id": "servicebus-relay",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "Service Bus relay pattern: receive a message, validate it, transform it, and forward to a downstream REST endpoint with idempotent delivery.",
+  "jobs": ["servicebus-relay.validate-and-forward"],
+  "requiredConfig": {
+    "queue.servicebus": ["EXECUTION_LEDGER_SERVICEBUS_NAMESPACE"]
+  },
+  "notes": [
+    "Requires Service Bus namespace configured with managed identity.",
+    "Connection strings are not supported."
+  ]
+}

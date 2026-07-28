@@ -1,0 +1,32 @@
+[package]
+name = "execution-ledger-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+execution-ledger-types.workspace = true
+chrono.workspace = true
+azure_core.workspace = true
+azure_identity.workspace = true
+base64 = "0.23"
+hmac = "0.13"
+sha2 = "0.11"
+url.workspace = true
+opentelemetry = { version = "0.32", features = ["trace"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace"] }
+opentelemetry-stdout = { version = "0.32", features = ["trace"] }
+
+[lints]
+workspace = true

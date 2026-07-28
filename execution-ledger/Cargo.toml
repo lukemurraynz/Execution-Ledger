@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = "0.8.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "net"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+drasi-lib = "0.8.9"
+drasi-source-mock = "0.2.7"
+drasi-source-postgres = "0.2.7"
+drasi-reaction-log = "0.2.5"
+drasi-reaction-http = "0.3.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "chrono", "uuid", "migrate"] }
+url = "2.5.8"
+uuid = { version = "1", features = ["serde", "v5"] }
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto", "use_pem"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+azure_core = "1.1.0"
+azure_identity = "1.0.0"
+azure_storage_blob = "1.0.0"
+execution-ledger-types = { path = "crates/execution-ledger-types" }
+execution-ledger-core = { path = "crates/execution-ledger-core" }
+execution-ledger-domain = { path = "crates/execution-ledger-domain" }
+jsonschema = "0.49"
+base64 = "0.23"
+pgp = "0.20"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+rand = "0.10"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "warn"
+dbg_macro = "warn"
+large_futures = "deny"
+too_many_lines = "allow"
+needless_pass_by_value = "allow"
+struct_field_names = "allow"

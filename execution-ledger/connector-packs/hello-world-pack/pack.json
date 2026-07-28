@@ -1,0 +1,12 @@
+{
+  "id": "hello-world",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "Minimal example pack that validates platform health and executes a REST call. Use this to verify your environment is configured correctly before building custom connectors.",
+  "jobs": ["hello-world.health-and-echo"],
+  "requiredConfig": {},
+  "notes": [
+    "No connector-specific configuration required. Uses only platform_health and rest connectors.",
+    "The REST call targets httpbin.org for demonstration. Replace with your own endpoint in production."
+  ]
+}

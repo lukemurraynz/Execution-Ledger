@@ -1,0 +1,9 @@
+<fragment>
+    <!-- Inbound: forward existing headers, generate if absent -->
+    <set-header name="x-request-id" exists-action="skip">
+        <value>@(context.RequestId.ToString())</value>
+    </set-header>
+    <set-header name="x-correlation-id" exists-action="skip">
+        <value>@(Guid.NewGuid().ToString())</value>
+    </set-header>
+</fragment>

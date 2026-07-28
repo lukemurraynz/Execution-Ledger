@@ -1,0 +1,61 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 15
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      patch:
+        update-types:
+          - "patch"
+        labels:
+          - "dependencies"
+          - "patch"
+      minor:
+        update-types:
+          - "minor"
+        labels:
+          - "dependencies"
+          - "minor"
+      major:
+        update-types:
+          - "major"
+        labels:
+          - "dependencies"
+          - "major"
+          - "breaking"
+        reviewers:
+          - "lukej"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions-patch:
+        update-types:
+          - "patch"
+      actions-minor:
+        update-types:
+          - "minor"
+      actions-major:
+        update-types:
+          - "major"
+        reviewers:
+          - "lukej"

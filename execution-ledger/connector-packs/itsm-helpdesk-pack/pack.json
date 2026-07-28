@@ -1,0 +1,29 @@
+{
+  "id": "itsm-helpdesk-pack",
+  "version": "0.1.0",
+  "owner": "platform-integration-team",
+  "description": "ITSM helpdesk ticket orchestration: agent-driven ticket creation, Teams notification via Power Automate, and ticket status tracking. Composes existing rest and queue connectors for a common service-desk scenario.",
+  "jobs": [
+    "helpdesk.ticket.create",
+    "helpdesk.ticket.escalate"
+  ],
+  "requiredConfig": {
+    "rest.foundry": [
+      "EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT",
+      "EXECUTION_LEDGER_FOUNDRY_AGENT_ID"
+    ],
+    "rest.teams_webhook": [
+      "EXECUTION_LEDGER_TEAMS_WEBHOOK_URL"
+    ],
+    "queue.servicebus": [
+      "EXECUTION_LEDGER_SERVICEBUS_NAMESPACE",
+      "EXECUTION_LEDGER_SERVICEBUS_QUEUE_NAME"
+    ]
+  },
+  "notes": [
+    "Service Bus connection strings are not supported. Managed identity only.",
+    "Teams webhook URL is the only unavoidable secret — store in Key Vault, not in environment variables.",
+    "The Foundry agent must be pre-registered with a File Search tool and create_ticket function tool.",
+    "Treat this file as contract metadata, not runtime executable configuration."
+  ]
+}

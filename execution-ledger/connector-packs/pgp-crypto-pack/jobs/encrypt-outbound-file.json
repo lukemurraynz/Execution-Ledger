@@ -1,0 +1,35 @@
+{
+  "id": "pgp-crypto.encrypt-outbound-file",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "encrypt-file",
+      "connector": "pgp",
+      "action": "encrypt",
+      "config": {
+        "partnerPublicKey": "<from Key Vault: EXECUTION_LEDGER_PGP_PARTNER_PUBLIC_KEY>",
+        "privateKey": "<from Key Vault: EXECUTION_LEDGER_PGP_PRIVATE_KEY>",
+        "privateKeyPassphrase": "<from Key Vault: EXECUTION_LEDGER_PGP_PRIVATE_KEY_PASSPHRASE>",
+        "fileName": "payment.txt"
+      },
+      "data": {
+        "_comment": "content/contentEncoding are supplied by job-launch input, e.g. the output of an upstream transform/rest step that produced the outbound payment file."
+      }
+    },
+    {
+      "id": "upload-file",
+      "connector": "sftp",
+      "action": "upload",
+      "config": {
+        "remotePath": "/outbox/payment.pgp"
+      },
+      "data": {},
+      "_comment": "sftp upload falls back to the immediately preceding step's base64 output when its own data/input is empty, same convention azure_blob already uses. Each step only sees ctx.upstream_output from the ONE step directly before it -- there's no fan-out, so don't insert another step between encrypt-file and upload-file expecting both to read encrypt-file's output; add a separate audit-copy job if you need one, rather than branching within this run."
+    }
+  ]
+}

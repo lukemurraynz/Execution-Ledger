@@ -1,0 +1,29 @@
+{
+  "id": "sftp-batch.download-and-store",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "download-file",
+      "connector": "sftp",
+      "action": "download",
+      "config": {
+        "remotePath": "/inbox/data-export.csv"
+      },
+      "data": {}
+    },
+    {
+      "id": "upload-to-blob",
+      "connector": "azure_blob",
+      "config": {
+        "container": "batch-ingestion",
+        "blobName": "imports/data-export.csv"
+      },
+      "data": {}
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "example-finance-settlement-pack",
+  "version": "0.1.0",
+  "owner": "platform-integration-team",
+  "description": "Example customer pack for file-to-settlement orchestration with explicit connector config requirements.",
+  "jobs": [
+    "finance.settlement.file-to-queue"
+  ],
+  "requiredConfig": {
+    "sftp": [
+      "EXECUTION_LEDGER_SFTP_HOST",
+      "EXECUTION_LEDGER_SFTP_USERNAME",
+      "EXECUTION_LEDGER_SFTP_PASSWORD"
+    ],
+    "queue.servicebus": [
+      "EXECUTION_LEDGER_SERVICEBUS_NAMESPACE",
+      "EXECUTION_LEDGER_SERVICEBUS_QUEUE_NAME"
+    ],
+    "erp.rest": [
+      "CONNECTOR_ERP_URL"
+    ]
+  },
+  "notes": [
+    "Service Bus connection strings are intentionally not supported. Managed identity only.",
+    "Treat this file as contract metadata, not runtime executable configuration."
+  ]
+}
+

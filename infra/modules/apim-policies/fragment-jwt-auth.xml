@@ -1,0 +1,10 @@
+<fragment>
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+        failed-validation-error-message="Unauthorized"
+        output-token-variable-name="jwt">
+        <openid-config url="{{entra-openid-config-url}}" />
+        <audiences>
+            <audience>{{entra-audience}}</audience>
+        </audiences>
+    </validate-jwt>
+</fragment>

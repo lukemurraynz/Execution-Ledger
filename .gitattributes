@@ -1,0 +1,2 @@
+# Keep sqlx migration checksums stable across build hosts.
+execution-ledger/crates/execution-ledger-core/migrations/*.sql text eol=lf

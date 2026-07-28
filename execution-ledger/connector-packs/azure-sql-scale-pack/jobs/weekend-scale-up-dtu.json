@@ -1,0 +1,30 @@
+{
+  "id": "azure-sql-scale.weekend-scale-up-dtu",
+  "description": "Scales DTU-based SQL Databases back to full production tier Monday morning. Replays the state captured by weekend-scale-down-dtu to restore exact previous SKU and license type (e.g. Hybrid Benefit).",
+  "trigger": "cron",
+  "cron": "0 7 * * 1",
+  "timezone": "UTC",
+  "steps": [
+    {
+      "id": "restore-db",
+      "connector": "azure_sql",
+      "action": "sql-database-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "serverName": "${SQL_SERVER_NAME}",
+        "databaseName": "${SQL_DATABASE_NAME}",
+        "targetSku": {
+          "name": "${SQL_RESTORE_SKU_NAME}",
+          "tier": "${SQL_RESTORE_SKU_TIER}",
+          "capacity": "${SQL_RESTORE_CAPACITY}"
+        }
+      },
+      "data": {
+        "licenseType": "${SQL_RESTORE_LICENSE_TYPE}",
+        "reason": "weekend scale-up restore",
+        "schedule": "weekend"
+      }
+    }
+  ]
+}

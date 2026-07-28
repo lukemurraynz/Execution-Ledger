@@ -1,0 +1,73 @@
+{
+  "jobId": "finance.settlement.file-to-queue",
+  "data": {
+    "sourceSystem": "core-banking",
+    "targetSystem": "settlement-gateway",
+    "metadata": {
+      "packId": "example-finance-settlement-pack",
+      "domain": "payments",
+      "scenario": "file-to-queue"
+    },
+    "steps": [
+      {
+        "id": "ingest-settlement-file",
+        "connector": "sftp",
+        "action": "download",
+        "externalId": "/inbound/settlement/current.csv",
+        "config": {
+          "host": "${EXECUTION_LEDGER_SFTP_HOST}",
+          "username": "${EXECUTION_LEDGER_SFTP_USERNAME}",
+          "password": "${EXECUTION_LEDGER_SFTP_PASSWORD}",
+          "remotePath": "/inbound/settlement/current.csv"
+        },
+        "_configNote": "action: 'download' reads the file rather than writing one. These values are resolved from environment variables at runtime. Set them in App Configuration or Container Apps env vars before launching."
+      },
+      {
+        "id": "archive-original-file",
+        "connector": "azure_blob",
+        "config": {
+          "container": "settlement-archive",
+          "blobName": "current.csv"
+        },
+        "_configNote": "No 'body' set, so this step automatically reads the prior step's downloaded content via ctx.upstream_output and uploads the original file bytes. Uses the filesystem provider unless a per-run 'url' is supplied — see the azure_blob connector's module docs."
+      },
+      {
+        "id": "transform-ledger-records",
+        "connector": "erp",
+        "externalId": "erp-settlement-transformer",
+        "data": {
+          "method": "POST",
+          "body": {
+            "template": "settlement-v1"
+          }
+        },
+        "config": {
+          "url": "${CONNECTOR_ERP_URL}"
+        },
+        "_configNote": "ERP endpoint URL. Must be reachable from the worker Container App."
+      },
+      {
+        "id": "publish-settlement-intent",
+        "connector": "queue",
+        "externalId": "settlement-intents",
+        "data": {
+          "priority": "high"
+        },
+        "config": {
+          "provider": "servicebus",
+          "queueName": "settlement-intents",
+          "namespace": "${EXECUTION_LEDGER_SERVICEBUS_NAMESPACE}"
+        },
+        "_configNote": "Service Bus queue. Managed identity must have 'Azure Service Bus Data Sender' role on the namespace."
+      },
+      {
+        "id": "platform-health-gate",
+        "connector": "platform_health",
+        "data": {
+          "check": "before-settlement-commit"
+        },
+        "_configNote": "No config required. Validates platform readiness before downstream steps."
+      }
+    ]
+  }
+}

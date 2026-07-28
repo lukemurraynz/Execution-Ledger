@@ -1,0 +1,14 @@
+{
+  "id": "sftp-batch",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "SFTP batch ingestion pattern: download files from an SFTP server, validate content, and upload to blob storage with idempotent deduplication.",
+  "jobs": ["sftp-batch.download-and-store"],
+  "requiredConfig": {
+    "sftp": ["EXECUTION_LEDGER_SFTP_HOST", "EXECUTION_LEDGER_SFTP_USERNAME"]
+  },
+  "notes": [
+    "SFTP password or key must be configured via Key Vault reference.",
+    "Connection strings are not supported in production."
+  ]
+}

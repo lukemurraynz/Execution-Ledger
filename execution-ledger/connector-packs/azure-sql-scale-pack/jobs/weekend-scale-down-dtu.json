@@ -1,0 +1,46 @@
+{
+  "id": "azure-sql-scale.weekend-scale-down-dtu",
+  "description": "Scales down DTU-based SQL Databases and Elastic Pools for weekend dev/test cost savings. Use sql-database-get to capture current SKU before resize. State blob enables restore on Monday morning.",
+  "trigger": "cron",
+  "cron": "0 20 * * 5",
+  "timezone": "UTC",
+  "steps": [
+    {
+      "id": "capture-db-state",
+      "connector": "azure_sql",
+      "action": "sql-database-get",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "serverName": "${SQL_SERVER_NAME}",
+        "databaseName": "${SQL_DATABASE_NAME}"
+      },
+      "data": {
+        "reason": "weekend scale-down state capture",
+        "schedule": "weekend"
+      }
+    },
+    {
+      "id": "scale-down-db",
+      "connector": "azure_sql",
+      "action": "sql-database-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "serverName": "${SQL_SERVER_NAME}",
+        "databaseName": "${SQL_DATABASE_NAME}",
+        "targetSku": {
+          "name": "S0",
+          "tier": "Standard",
+          "capacity": 10
+        }
+      },
+      "data": {
+        "reason": "weekend scale-down — cost optimization",
+        "schedule": "weekend",
+        "previousSku": "${step.capture-db-state.output.currentSku}",
+        "previousLicenseType": "${step.capture-db-state.output.licenseType}"
+      }
+    }
+  ]
+}

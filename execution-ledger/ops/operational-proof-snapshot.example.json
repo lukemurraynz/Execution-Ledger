@@ -1,0 +1,34 @@
+{
+  "snapshot_id": "example-2026-07-25T08:00:00Z",
+  "window_minutes": 15,
+  "error_budget": {
+    "failure_rate": 0.011,
+    "burn_rate_1h": 1.2,
+    "burn_rate_6h": 0.8,
+    "total_requests": 1860
+  },
+  "queue": {
+    "intent_queue_lag_seconds_p95": 65,
+    "intent_queue_oldest_message_seconds": 140
+  },
+  "runtime": {
+    "restart_window_minutes": 10,
+    "service_restarts": {
+      "execution-ledger-api": 1,
+      "execution-ledger-worker": 0,
+      "execution-ledger-scheduler": 0
+    }
+  },
+  "security": {
+    "api_auth_mode": "managed_identity",
+    "servicebus_auth_mode": "managed_identity",
+    "secret_resolution_failures": 0,
+    "missing_required_secrets": 0
+  },
+  "slos": {
+    "platform_jobs_trigger_success_ratio": 0.999,
+    "platform_jobs_list_success_ratio": 0.998,
+    "mcp_tool_call_success_ratio": 0.997,
+    "platform_jobs_trigger_latency_p95_ms": 840
+  }
+}

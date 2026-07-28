@@ -1,0 +1,43 @@
+{
+  "id": "d365-dmf.export-start",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "start-export",
+      "connector": "erp",
+      "config": {
+        "url": "<EXECUTION_LEDGER_D365_BROKER_URL>"
+      },
+      "data": {
+        "body": {
+          "PartURL": "/data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.ExportToPackage",
+          "Data": {
+            "definitionGroupId": "<dmf-package-name>",
+            "legalEntityId": "<legal-entity-id>",
+            "packageName": "<dmf-package-name>",
+            "reExecute": "false"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "object",
+            "properties": {
+              "value": { "type": "string" }
+            },
+            "required": ["value"]
+          }
+        },
+        "required": ["response"]
+      },
+      "_comment": "response.value is the D365 executionId. Read it from this step's persisted output (jobs.get_steps) and pass it as executionId into export-poll's job-launch input."
+    }
+  ]
+}

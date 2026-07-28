@@ -1,0 +1,23 @@
+{
+  "id": "pgp-crypto",
+  "version": "0.1.0",
+  "owner": "platform-engineering",
+  "description": "PGP encrypt-and-sign / decrypt-and-verify pattern for partner file exchange: sftp/blob source -> pgp connector -> blob destination, as a single in-pipeline connector step rather than a separate encrypt/decrypt service.",
+  "jobs": [
+    "pgp-crypto.decrypt-inbound-file",
+    "pgp-crypto.encrypt-outbound-file"
+  ],
+  "requiredConfig": {
+    "pgp": [
+      "EXECUTION_LEDGER_PGP_PARTNER_PUBLIC_KEY",
+      "EXECUTION_LEDGER_PGP_PRIVATE_KEY",
+      "EXECUTION_LEDGER_PGP_PRIVATE_KEY_PASSPHRASE"
+    ],
+    "sftp": ["EXECUTION_LEDGER_SFTP_HOST", "EXECUTION_LEDGER_SFTP_USERNAME"]
+  },
+  "notes": [
+    "partnerPublicKey and privateKey are base64-encoded ASCII-armored OpenPGP keys.",
+    "All three PGP secrets must be Key Vault references in App Configuration. Connection strings and raw key material in plain env vars are not supported in production.",
+    "The pgp connector does not touch blob storage itself. It reads/writes the same base64 { content, contentEncoding } shape the sftp connector's download action produces, so it composes as sftp -> pgp -> azure_blob without a dedicated blob-read connector."
+  ]
+}

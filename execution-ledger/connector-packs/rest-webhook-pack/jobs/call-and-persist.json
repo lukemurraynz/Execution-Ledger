@@ -1,0 +1,23 @@
+{
+  "id": "rest-webhook.call-and-persist",
+  "steps": [
+    {
+      "id": "health-check",
+      "connector": "platform_health",
+      "config": {},
+      "data": {}
+    },
+    {
+      "id": "call-webhook",
+      "connector": "rest",
+      "config": {
+        "url": "<your-webhook-endpoint>",
+        "method": "POST"
+      },
+      "data": {
+        "description": "Call external webhook endpoint and persist response",
+        "idempotencyKey": "webhook-call-${runId}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "azure-compute-scale.metric-reactive-scale-down",
+  "description": "Scales down VMSS when metrics have been low for a sustained window. Triggered by Drasi continuous query watching Event Hub (Azure Monitor metric alerts). Requires drasi-reaction-http pointing at /platform/jobs/trigger. See docs/drasi-sources.md for Event Hub pipeline setup. State capture step before resize enables restore via compensate/replay.",
+  "steps": [
+    {
+      "id": "capture-vmss-state",
+      "connector": "azure_compute",
+      "action": "vmss-get",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod"
+      },
+      "data": {
+        "reason": "state capture before scale-down",
+        "triggeredBy": "drasi-event-hub"
+      }
+    },
+    {
+      "id": "scale-down-vmss",
+      "connector": "azure_compute",
+      "action": "vmss-resize",
+      "config": {
+        "subscriptionId": "${AZURE_SUBSCRIPTION_ID}",
+        "resourceGroup": "${AZURE_RESOURCE_GROUP}",
+        "vmssName": "vmss-prod",
+        "targetSku": {
+          "name": "Standard_B2s",
+          "tier": "Burstable"
+        },
+        "capacity": {
+          "desiredCapacity": 1
+        }
+      },
+      "data": {
+        "reason": "metric-reactive scale-down — CPU < 5% and queue_depth = 0 for 30 minutes",
+        "triggeredBy": "drasi-event-hub",
+        "previousSku": "${step.capture-vmss-state.output.currentSku}",
+        "previousCapacity": "${step.capture-vmss-state.output.currentCapacity}"
+      }
+    }
+  ]
+}
