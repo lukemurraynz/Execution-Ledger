@@ -4,35 +4,35 @@
 
 This pack orchestrates IT service desk ticket workflows using Microsoft Foundry agents. It covers two common scenarios:
 
-1. **Ticket creation** — invoke a Foundry agent, persist the ticket record, and notify a Teams channel via Adaptive Card.
-2. **Ticket escalation** — invoke the agent with escalation context, publish an event to Service Bus for async worker processing, and send a follow-up message to the user's conversation.
+1. **Ticket creation**: invoke a Foundry agent, persist the ticket record, and notify a Teams channel via Adaptive Card.
+2. **Ticket escalation**: invoke the agent with escalation context, publish an event to Service Bus for async worker processing, and send a follow-up message to the user's conversation.
 
 Both flows compose existing `rest` and `queue` connectors. No new core connectors are required.
 
 ## Included job templates
 
-- `jobs/helpdesk.ticket.create.json` — synchronous ticket creation with Teams notification
-- `jobs/helpdesk.ticket.escalate.json` — async escalation with Service Bus event dispatch
+- `jobs/helpdesk.ticket.create.json`: synchronous ticket creation with Teams notification
+- `jobs/helpdesk.ticket.escalate.json`: async escalation with Service Bus event dispatch
 
 ## Required environment variables
 
 Before running this pack, ensure these variables are set in App Configuration or Container Apps:
 
-| Variable | Used by | Notes |
-|----------|---------|-------|
-| `EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT` | REST connector | Foundry project endpoint (e.g. `https://<project>.services.api.azureml.ms`) |
-| `EXECUTION_LEDGER_FOUNDRY_AGENT_ID` | REST connector | Registered agent ID (e.g. `helpdesk-agent`) |
-| `EXECUTION_LEDGER_TEAMS_WEBHOOK_URL` | REST connector | Power Automate HTTP-triggered flow webhook URL |
-| `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE` | Queue connector | Service Bus namespace (managed identity must have send rights) |
-| `EXECUTION_LEDGER_SERVICEBUS_QUEUE_NAME` | Queue connector | Target queue name (e.g. `ticket-worker`) |
-| `EXECUTION_LEDGER_TICKET_STORAGE_URL` | REST connector | Ticket persistence endpoint (Table Storage or equivalent API) |
+| Variable                                    | Used by         | Notes                                                                       |
+| ------------------------------------------- | --------------- | --------------------------------------------------------------------------- |
+| `EXECUTION_LEDGER_FOUNDRY_PROJECT_ENDPOINT` | REST connector  | Foundry project endpoint (e.g. `https://<project>.services.api.azureml.ms`) |
+| `EXECUTION_LEDGER_FOUNDRY_AGENT_ID`         | REST connector  | Registered agent ID (e.g. `helpdesk-agent`)                                 |
+| `EXECUTION_LEDGER_TEAMS_WEBHOOK_URL`        | REST connector  | Power Automate HTTP-triggered flow webhook URL                              |
+| `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE`     | Queue connector | Service Bus namespace (managed identity must have send rights)              |
+| `EXECUTION_LEDGER_SERVICEBUS_QUEUE_NAME`    | Queue connector | Target queue name (e.g. `ticket-worker`)                                    |
+| `EXECUTION_LEDGER_TICKET_STORAGE_URL`       | REST connector  | Ticket persistence endpoint (Table Storage or equivalent API)               |
 
 ## Prerequisites
 
-1. **Foundry agent registered** — the agent must be pre-registered with a File Search tool (over IT documentation) and `create_ticket` / `get_ticket_status` function tools. Registration is outside Execution Ledger's scope; use your own Foundry agent-provisioning tooling (script, Terraform, or the Foundry portal) to create and register the agent, then note its agent ID for `EXECUTION_LEDGER_FOUNDRY_AGENT_ID` below.
-2. **Custom Foundry role** — the built-in `Foundry Agent Consumer` role is insufficient. A custom role granting `endpoints/interact/action` + `agents/read` + `agents/write` is required. Define this role in your own IaC (Bicep or Terraform) alongside your Foundry project deployment.
-3. **Teams webhook** — a Power Automate HTTP-triggered flow that renders an Adaptive Card. The webhook URL is the only unavoidable secret; store in Key Vault.
-4. **Service Bus queue** — the `ticket-worker` queue must exist with the worker's managed identity having `Azure Service Bus Data Receiver` role.
+1. **Foundry agent registered**: the agent must be pre-registered with a File Search tool (over IT documentation) and `create_ticket` / `get_ticket_status` function tools. Registration is outside Execution Ledger's scope; use your own Foundry agent-provisioning tooling (script, Terraform, or the Foundry portal) to create and register the agent, then note its agent ID for `EXECUTION_LEDGER_FOUNDRY_AGENT_ID` below.
+2. **Custom Foundry role**: the built-in `Foundry Agent Consumer` role is insufficient. A custom role granting `endpoints/interact/action` + `agents/read` + `agents/write` is required. Define this role in your own IaC (Bicep or Terraform) alongside your Foundry project deployment.
+3. **Teams webhook**: a Power Automate HTTP-triggered flow that renders an Adaptive Card. The webhook URL is the only unavoidable secret; store in Key Vault.
+4. **Service Bus queue**: the `ticket-worker` queue must exist with the worker's managed identity having `Azure Service Bus Data Receiver` role.
 
 ## Preflight checks before first run
 
@@ -81,6 +81,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Managed identity lacks the required Foundry agent-runtime role. The built-in `Foundry Agent Consumer` role does not grant `agents/write`.
 
 **Fix:**
+
 1. Verify the custom role is assigned to the API's managed identity.
 2. The role must grant: `endpoints/interact/action`, `agents/read`, `agents/write`.
 3. Once fixed, replay the step: `cargo run -p execution-ledger-cli -- job-replay <tenant-id> <run-id> invoke-foundry-agent`
@@ -92,7 +93,8 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Agent processing exceeded the 60-second timeout.
 
 **Fix:**
-1. Check Application Insights for the `agent.invoke` span — look at token counts and tool selection.
+
+1. Check Application Insights for the `agent.invoke` span; look at token counts and tool selection.
 2. If the agent is searching a large knowledge base, consider reducing the vector store size or adding filters.
 3. Increase `timeoutMs` in the step config if the agent legitimately needs more time.
 4. Replay the step after adjusting.
@@ -104,8 +106,9 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Table Storage or ticket API is temporarily unavailable.
 
 **Fix:**
+
 1. Check Azure resource health for the storage account.
-2. If transient, replay the step — idempotency ensures the same ticket isn't duplicated.
+2. If transient, replay the step; idempotency ensures the same ticket isn't duplicated.
 3. If persistent, check the storage account's network rules and the worker's managed identity permissions.
 
 ### Step 2 (Ticket persistence) fails: duplicate ticket ID
@@ -115,7 +118,8 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** A ticket with the same ID already exists (idempotency guard).
 
 **Fix:**
-1. This is expected behavior on replay — the step already succeeded previously.
+
+1. This is expected behavior on replay; the step already succeeded previously.
 2. Check step output via `GET /platform/jobs/{id}/steps` to confirm the ticket record exists.
 3. If the ticket needs updating, use a compensate action instead of re-creating.
 
@@ -126,9 +130,10 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Power Automate flow is disabled or webhook URL has changed.
 
 **Fix:**
+
 1. Verify the flow is active in Power Automate.
 2. Confirm `EXECUTION_LEDGER_TEAMS_WEBHOOK_URL` in Key Vault matches the flow's trigger URL.
-3. Replay only the notification step — the ticket record is already persisted.
+3. Replay only the notification step; the ticket record is already persisted.
 4. `cargo run -p execution-ledger-cli -- job-replay <tenant-id> <run-id> notify-teams-channel`
 
 ### Step 3 (Teams notification) fails: Adaptive Card rejected
@@ -138,9 +143,10 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Adaptive Card schema mismatch or missing required fields.
 
 **Fix:**
+
 1. Validate the card JSON at https://adaptivecards.io/designer.
 2. Ensure `$schema` and `version` are present.
-3. Fix the card template in the Power Automate flow (not in Execution Ledger — the card is rendered by the flow).
+3. Fix the card template in the Power Automate flow (not in Execution Ledger; the card is rendered by the flow).
 4. Replay the step.
 
 ### Step 2 (Service Bus) fails: namespace not found
@@ -150,6 +156,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Service Bus namespace not configured or not reachable.
 
 **Fix:**
+
 1. Confirm `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE` is set in App Configuration.
 2. Confirm the worker's managed identity has `Azure Service Bus Data Sender` role.
 3. Replay the step after fixing configuration.
@@ -159,6 +166,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Symptom:** Run appears stuck in "running" state with no step progress.
 
 **Fix:**
+
 ```bash
 # Release stale leases
 cargo run -p execution-ledger-cli -- recovery-runs
@@ -173,6 +181,7 @@ curl -X POST https://<apim-gateway>/platform/recovery/runs?limit=100 \
 **Symptom:** Intent appears in poison/dead-letter queue after multiple failures.
 
 **Fix:**
+
 ```bash
 # Drain poison messages
 cargo run -p execution-ledger-cli -- recovery-servicebus-poison
@@ -192,10 +201,10 @@ curl -X POST https://<apim-gateway>/platform/recovery/servicebus-poison?limit=50
 
 ## Monitoring
 
-- **Step status:** `GET /platform/jobs/{id}/steps` — shows each step's state, idempotency key, and output.
+- **Step status:** `GET /platform/jobs/{id}/steps` shows each step's state, idempotency key, and output.
 - **Correlation tracing:** Every step output includes a `correlationId`. Use this in Log Analytics to trace the full execution path across API, worker, and connector calls.
-- **Run listing:** `GET /platform/jobs?limit=50` — shows recent runs with tenant, status, and timestamps.
-- **Foundry agent traces:** Check Application Insights for `agent.invoke` custom spans — they include conversation ID, selected tools, and token counts.
+- **Run listing:** `GET /platform/jobs?limit=50` shows recent runs with tenant, status, and timestamps.
+- **Foundry agent traces:** Check Application Insights for `agent.invoke` custom spans; they include conversation ID, selected tools, and token counts.
 
 ## Customization
 

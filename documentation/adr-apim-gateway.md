@@ -55,7 +55,7 @@ APIM deployment is a toggle, not a hard requirement: `infra/main.bicep`'s `apimD
 
 ## References
 
-- `execution-ledger/README.md` — "Security posture", "Gateway and config bootstrap notes"
+- `execution-ledger/README.md`: "Security posture", "Gateway and config bootstrap notes"
 - `infra/modules/apim.bicep`, `infra/modules/apim-policies/api-policy.xml`
-- `infra/main.bicep` — `apimDeploymentMode` parameter
-- `execution-ledger/crates/execution-ledger-api/src/main.rs` — gateway-secret enforcement and tests
+- `infra/main.bicep`: `apimDeploymentMode` parameter
+- `execution-ledger/crates/execution-ledger-api/src/main.rs`: gateway-secret enforcement and tests

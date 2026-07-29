@@ -1,0 +1,23 @@
+{
+  "id": "hello-world.drasi-heartbeat-check",
+  "steps": [
+    {
+      "id": "check-drasi",
+      "connector": "platform_health",
+      "action": "drasi-heartbeat-check",
+      "config": {
+        "healthUrl": "https://<api-host>/health",
+        "alert": {
+          "target": "outlook_send_mail",
+          "userId": "<alert-mailbox-user-id>",
+          "to": "<on-call-distribution-list>",
+          "subject": "Execution Ledger: Drasi heartbeat missing",
+          "bodyText": "The drasi:heartbeat KV entry has expired — execution-ledger-drasi may be down. Check the Drasi container app and any batch windows or schedules that depend on reactive release."
+        }
+      },
+      "data": {
+        "description": "Independent backstop for silent Drasi degradation — runs on the ordinary scheduler+worker path, not on Drasi itself, so it still fires when Drasi is fully down."
+      }
+    }
+  ]
+}

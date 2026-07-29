@@ -4,7 +4,7 @@ Durable job orchestration for Azure. Step-level idempotency, replay, skip, and c
 
 ## Try it locally (no Azure account needed)
 
-The fastest path: a devcontainer that provisions a local Postgres with the settings this project needs (including logical replication for the Drasi WAL reader) and pre-wires the runtime env vars.
+The fastest path is a devcontainer that provisions a local Postgres with the settings this project needs (including logical replication for the Drasi WAL reader) and pre-wires the runtime env vars:
 
 1. Open this repo in VS Code and choose **Reopen in Container** (or `devcontainer up` from the CLI). This starts a local Postgres alongside your dev container; see [`.devcontainer/docker-compose.yml`](../.devcontainer/docker-compose.yml).
 2. Inside the container:
@@ -15,7 +15,7 @@ The fastest path: a devcontainer that provisions a local Postgres with the setti
    cargo run -p execution-ledger-cli -- job-launch <tenant-id> hello-world.health-and-echo '{"steps":[{"id":"health","connector":"platform_health"}]}'
    ```
 
-No `EXECUTION_LEDGER_QUEUE_ENGINE` setting is needed for this: it defaults to `local` (in-database queue, `FOR UPDATE SKIP LOCKED`), and `EXECUTION_LEDGER_ENV` defaults to `local` too. Both only need to be set explicitly when deploying to Azure. See [Run locally](#run-locally) further down for the full command set (recovery, GC, replay/skip/compensate) once you're past the first run.
+No `EXECUTION_LEDGER_QUEUE_ENGINE` setting is needed for this. It defaults to `local` (in-database queue, `FOR UPDATE SKIP LOCKED`), and `EXECUTION_LEDGER_ENV` defaults to `local` too. Both only need to be set explicitly when deploying to Azure. See [Run locally](#run-locally) further down for the full command set (recovery, GC, replay/skip/compensate) once you're past the first run.
 
 ## Deploy to Azure
 
@@ -45,35 +45,37 @@ Execution Ledger is a Rust multi-service backend for durable job orchestration, 
 
 ## Cost estimate (approximate monthly Azure spend)
 
-| Component | Small (dev/test) | Medium (production) | Large (high-throughput) |
-|---|---|---|---|
-| Container Apps (4 services) | ~$50/mo | ~$200/mo | ~$600/mo |
-| PostgreSQL Flexible Server | ~$50/mo | ~$200/mo | ~$500/mo |
-| Service Bus (Standard) | ~$10/mo | ~$10/mo | ~$10/mo + throughput |
-| App Configuration | ~$5/mo | ~$5/mo | ~$5/mo |
-| Key Vault | ~$5/mo | ~$5/mo | ~$5/mo |
-| Log Analytics | ~$10/mo | ~$50/mo | ~$200/mo |
-| APIM (Developer) | $0 | ~$70/mo (Standard) | ~$300/mo (Premium) |
-| **Total (approx)** | **~$130/mo** | **~$540/mo** | **~$1,620/mo** |
+| Component                   | Small (dev/test) | Medium (production)   | Large (high-throughput) |
+| --------------------------- | ---------------- | --------------------- | ----------------------- |
+| Container Apps (4 services) | ~$50/mo          | ~$200/mo              | ~$600/mo                |
+| PostgreSQL Flexible Server  | ~$50/mo          | ~$200/mo              | ~$500/mo                |
+| Service Bus (Standard)      | ~$10/mo          | ~$10/mo               | ~$10/mo + throughput    |
+| App Configuration           | ~$5/mo           | ~$5/mo                | ~$5/mo                  |
+| Key Vault                   | ~$5/mo           | ~$5/mo                | ~$5/mo                  |
+| Log Analytics               | ~$10/mo          | ~$50/mo               | ~$200/mo                |
+| APIM (StandardV2)           | ~$250/mo         | ~$250/mo (StandardV2) | ~$300/mo (Premium)      |
+| **Total (approx)**          | **~$380/mo**     | **~$790/mo**          | **~$1,920/mo**          |
 
 Costs vary by region, reserved capacity, and actual utilization. Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for precise estimates.
 
+> **Note:** APIM StandardV2 is the default deployed SKU (confirmed in production deployment). It provides a 99.95% SLA and no cold-start penalty vs the Developer tier. The higher base cost ($250/mo) reflects these production-grade characteristics.
+
 ## How it compares
 
-| Capability | Execution Ledger | Azure Durable Functions | Temporal | Custom scripts |
-|---|---|---|---|---|
-| Step-level replay | Yes (targeted) | Yes (rewind) | Yes (continue-as-new) | No |
-| Coordinated compensation | Yes (reverse-order undo) | Manual | Saga pattern | No |
-| Schema validation | Yes (JSON Schema, per-step) | No (manual) | No (manual) | No |
-| Tenant isolation | Query-level | Function-level | Namespace-level | Manual |
-| Self-hosted control plane | Yes (Container Apps) | No (serverless) | Yes (Kubernetes) | Yes |
-| Connector extensibility | Pack-based, opt-in | Durable entities | Activity functions | Per-script |
-| Operational recovery APIs | Built-in (replay/skip/compensate) | Manual | Manual | Manual |
-| Chaos/DR proof scripts | Built-in | No | No | No |
-| Managed identity-first | Yes | Yes (Azure-native) | No (requires config) | Varies |
-| Fail-closed connectors | Yes (enforced) | No (implicit) | No (explicit) | No |
-| Learning curve | Medium | Low (Azure-native) | High (different execution model) | Low |
-| Best for | Multi-tenant orchestration with recovery guarantees | Serverless event-driven workflows | Complex long-running workflows | Simple automation |
+| Capability                | Execution Ledger                                    | Azure Durable Functions           | Temporal                       | Custom scripts    |
+| ------------------------- | --------------------------------------------------- | --------------------------------- | ------------------------------ | ----------------- |
+| Step-level replay         | Yes (targeted)                                      | Yes (rewind)                      | Yes (continue-as-new)          | No                |
+| Coordinated compensation  | Yes (reverse-order undo)                            | Manual                            | Saga pattern                   | No                |
+| Schema validation         | Yes (JSON Schema, per-step)                         | No (manual)                       | No (manual)                    | No                |
+| Tenant isolation          | Query-level                                         | Function-level                    | Namespace-level                | Manual            |
+| Self-hosted control plane | Yes (Container Apps)                                | No (serverless)                   | Yes (Kubernetes)               | Yes               |
+| Connector extensibility   | Pack-based, opt-in                                  | Durable entities                  | Activity functions             | Per-script        |
+| Operational recovery APIs | Built-in (replay/skip/compensate)                   | Manual                            | Manual                         | Manual            |
+| Chaos/DR proof scripts    | Built-in                                            | No                                | No                             | No                |
+| Managed identity-first    | Yes                                                 | Yes (Azure-native)                | No (requires config)           | Varies            |
+| Fail-closed connectors    | Yes (enforced)                                      | No (implicit)                     | No (explicit)                  | No                |
+| Learning curve            | Medium                                              | Low (Azure-native)                | High (new model)               | Low               |
+| Best for                  | Multi-tenant orchestration with recovery guarantees | Serverless event-driven workflows | Complex long-running workflows | Simple automation |
 
 **When to use Execution Ledger:** Multi-tenant workloads needing step-level replay, tenant isolation, and built-in operational recovery. When you need a self-hosted control plane with audit-ready evidence.
 
@@ -95,7 +97,7 @@ Execution Ledger is designed for multi-tenant production workloads where trust b
 
 ## Operational maturity
 
-Most orchestration platforms add recovery and observability after the first production incident. Execution Ledger ships these as first-class capabilities:
+Most orchestration platforms add recovery and observability after the first production incident. Execution Ledger ships these capabilities as first-class features:
 
 - Route invalid or unprocessable intents to dead-letter paths for poison queue recovery. The CLI and API expose `recovery-local-poison` and `recovery-servicebus-poison` endpoints to drain, inspect, and reprocess these messages without manual database surgery.
 - Recover stale leases. When a worker crashes or loses connectivity mid-execution, the run-level and schedule-level leases remain locked. The `recovery-runs` and `recovery-schedules` endpoints detect and release stale leases so work can resume.
@@ -168,16 +170,16 @@ Scope:     mcp:execute (required for all tools)
 
 Each tool exposes `title`, `description`, `inputSchema`, and `annotations` (readOnlyHint, destructiveHint, idempotentHint). Tools are scope-gated: `tools/list` returns only tools the caller's token entitles them to use.
 
-| Tool | Scope | Annotations | Arguments | Returns |
-|---|---|---|---|---|
-| `execution_ledger.health` | `mcp:execute` | read-only, idempotent | — | `{ status, environment }` |
-| `execution_ledger.jobs.get` | `jobs:read:*` | read-only, idempotent | `{ runId: string }` | `{ id, jobId, status, currentAttempt, maxAttempts }` |
-| `execution_ledger.jobs.list` | `jobs:read:*` | read-only, idempotent | `{ status?: string, limit?: integer }` | `{ runs: [...], count }` |
-| `execution_ledger.jobs.get_steps` | `jobs:read:*` | read-only, idempotent | `{ runId: string }` | `{ steps: [...], count }` |
-| `execution_ledger.schedules.list` | `platform:read` | read-only, idempotent | `{ limit?: integer }` | `{ schedules: [...], count }` |
-| `execution_ledger.schedules.enable` | `platform:write` | read-write, non-destructive | `{ schedulerId: string }` | `{ schedulerId, status: "ACTIVE" }` |
-| `execution_ledger.schedules.disable` | `platform:write` | read-write, non-destructive | `{ schedulerId: string }` | `{ schedulerId, status: "DISABLED" }` |
-| `execution_ledger.recovery.runs` | `platform:write` | destructive | `{ limit?: integer }` | `{ requeuedPending, failedTerminal }` |
+| Tool                                 | Scope            | Annotations                 | Arguments                              | Returns                                              |
+| ------------------------------------ | ---------------- | --------------------------- | -------------------------------------- | ---------------------------------------------------- |
+| `execution_ledger.health`            | `mcp:execute`    | read-only, idempotent       | N/A                                    | `{ status, environment }`                            |
+| `execution_ledger.jobs.get`          | `jobs:read:*`    | read-only, idempotent       | `{ runId: string }`                    | `{ id, jobId, status, currentAttempt, maxAttempts }` |
+| `execution_ledger.jobs.list`         | `jobs:read:*`    | read-only, idempotent       | `{ status?: string, limit?: integer }` | `{ runs: [...], count }`                             |
+| `execution_ledger.jobs.get_steps`    | `jobs:read:*`    | read-only, idempotent       | `{ runId: string }`                    | `{ steps: [...], count }`                            |
+| `execution_ledger.schedules.list`    | `platform:read`  | read-only, idempotent       | `{ limit?: integer }`                  | `{ schedules: [...], count }`                        |
+| `execution_ledger.schedules.enable`  | `platform:write` | read-write, non-destructive | `{ schedulerId: string }`              | `{ schedulerId, status: "ACTIVE" }`                  |
+| `execution_ledger.schedules.disable` | `platform:write` | read-write, non-destructive | `{ schedulerId: string }`              | `{ schedulerId, status: "DISABLED" }`                |
+| `execution_ledger.recovery.runs`     | `platform:write` | destructive                 | `{ limit?: integer }`                  | `{ requeuedPending, failedTerminal }`                |
 
 All tools return JSON-RPC 2.0 responses. Errors use standard MCP error codes: `-32601` (tool not found), `-32602` (invalid params), `-32000` (database error), `-32003` (forbidden), `-32004` (not found).
 
@@ -244,7 +246,7 @@ Returns the MCP resource URL and authorization server endpoints for OAuth 2.0 pr
 
 - `execution-ledger-api`: Axum HTTP API with Entra JWT validation and tenant authorization.
 - `execution-ledger-worker`: Durable intent worker with per-replica bounded concurrency (Service Bus or local queue).
-- `execution-ledger-drasi`: PostgreSQL WAL reader (singleton); streams completed/failed job-run events to a webhook via Drasi.
+- `execution-ledger-drasi`: PostgreSQL WAL reader (singleton) that streams completed/failed job-run events to a webhook via Drasi.
 - `execution-ledger-scheduler`: Claims due schedules with `FOR UPDATE SKIP LOCKED`, enqueues intents directly to Service Bus, and advances `next_run` from cron expressions. Drasi monitors schedule records via the WAL for reactive enqueue as a secondary path.
 - `execution-ledger-cli`: operational CLI for db/kv/scheduler/job launch/schedule release + replay/skip/compensate workflows.
 - `execution-ledger-core`: shared config, auth, DB bootstrap, and typed error layer.
@@ -332,14 +334,14 @@ Execution Ledger scales horizontally through worker replicas and vertically thro
 
 #### How each service scales
 
-| Service | Scaling model | Default range | Scaling unit |
-|---------|--------------|---------------|-------------|
-| **API** | Fixed replicas behind APIM load balancer | 1–3 | Concurrent HTTP requests |
-| **Worker** | KEDA autoscale on Service Bus queue depth; per-replica bounded concurrency (default 5) | 1–10 | Concurrent intent processing tasks |
-| **Drasi** | Singleton (WAL replication slot ownership) | 1 | PostgreSQL change events → webhook |
-| **Scheduler** | Singleton (lease-based; claims due schedules, enqueues directly to Service Bus) | 1 | Schedule records updated per tick |
-| **Service Bus** | Managed by Azure (Standard SKU, partitioned) | — | Partitioned brokers |
-| **PostgreSQL** | Flexible Server (SKU-dependent connection limit) | — | `max_connections` per SKU |
+| Service         | Scaling model                                                                          | Default range | Scaling unit                       |
+| --------------- | -------------------------------------------------------------------------------------- | ------------- | ---------------------------------- |
+| **API**         | Fixed replicas behind APIM load balancer                                               | 1–3           | Concurrent HTTP requests           |
+| **Worker**      | KEDA autoscale on Service Bus queue depth; per-replica bounded concurrency (default 5) | 1–10          | Concurrent intent processing tasks |
+| **Drasi**       | Singleton (WAL replication slot ownership)                                             | 1             | PostgreSQL change events → webhook |
+| **Scheduler**   | Singleton (lease-based; claims due schedules, enqueues directly to Service Bus)        | 1             | Schedule records updated per tick  |
+| **Service Bus** | Managed by Azure (Standard SKU, partitioned)                                           | N/A           | Partitioned brokers                |
+| **PostgreSQL**  | Flexible Server (SKU-dependent connection limit)                                       | N/A           | `max_connections` per SKU          |
 
 #### Worker scaling mechanics
 
@@ -352,22 +354,22 @@ Steps within a single intent execute **sequentially**. This is intentional. Conn
 
 #### Scaling tiers
 
-| Load | What happens | What to tune |
-|------|-------------|-------------|
-| **1–10 jobs/sec** | 1–2 worker replicas, trivial load | Nothing. Default config handles this |
-| **10–50 jobs/sec** | KEDA scales to 2–5 workers; per-replica concurrency handles bursts | Monitor queue depth and replica count in Log Analytics |
+| Load                | What happens                                                                          | What to tune                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **1–10 jobs/sec**   | 1–2 worker replicas, trivial load                                                     | Nothing. Default config handles this                                                             |
+| **10–50 jobs/sec**  | KEDA scales to 2–5 workers; per-replica concurrency handles bursts                    | Monitor queue depth and replica count in Log Analytics                                           |
 | **50–500 jobs/sec** | KEDA hits `maxReplicas: 10` ceiling, 5 concurrent per replica = 50 concurrent intents | Increase `workerScaleMaxReplicas` (up to 30) or `EXECUTION_LEDGER_WORKER_MAX_CONCURRENT_INTENTS` |
-| **500+ jobs/sec** | Service Bus throughput becomes bottleneck | Upgrade to Premium; increase API replicas; tune PG `max_connections` |
+| **500+ jobs/sec**   | Service Bus throughput becomes bottleneck                                             | Upgrade to Premium; increase API replicas; tune PG `max_connections`                             |
 
 #### Connection pool sizing
 
 Each service opens a PostgreSQL connection pool. The pool defaults to 10 connections (`sqlx` default). With N worker replicas, total PG connections ≈ N × pool_size. Azure PostgreSQL Flexible Server connection limits by SKU:
 
-| SKU tier | `max_connections` |
-|----------|-------------------|
-| Burstable B1ms | 97 |
-| General Purpose D2s_v5 | 97 |
-| Memory Optimized E2s_v5 | 97 |
+| SKU tier                | `max_connections` |
+| ----------------------- | ----------------- |
+| Burstable B1ms          | 97                |
+| General Purpose D2s_v5  | 97                |
+| Memory Optimized E2s_v5 | 97                |
 
 Set `EXECUTION_LEDGER_PG_MAX_CONNECTIONS` per service to stay within the PG limit. Set the worker pool size ≥ `concurrent intents + 2` to avoid pool exhaustion during concurrent processing. Example: 10 workers × 7 connections = 70 + 3 API + 1 scheduler + 1 drasi = 75 (under 97).
 
@@ -379,7 +381,7 @@ The Drasi service was split from the worker in the scaling refactor. Previously,
 
 #### Scheduler singleton
 
-The scheduler uses `FOR UPDATE SKIP LOCKED` to safely claim due schedules, so it *could* run as multiple replicas. The current Bicep config constrains it to `maxReplicas: 1` because the scheduler only enqueues intents. The real work is done by workers. If the scheduler tick becomes a bottleneck (thousands of cron schedules), increase `maxReplicas` and the `CLAIM_LIMIT` constant.
+The scheduler uses `FOR UPDATE SKIP LOCKED` to safely claim due schedules, so it _could_ run as multiple replicas. The current Bicep config constrains it to `maxReplicas: 1` because the scheduler only enqueues intents. The real work is done by workers. If the scheduler tick becomes a bottleneck (thousands of cron schedules), increase `maxReplicas` and the `CLAIM_LIMIT` constant.
 
 ### Gateway and config bootstrap notes
 
@@ -479,7 +481,7 @@ npm run tauri dev
 
 For admin onboarding and connection setup, see `tauri-operator/README.md`.
 
-The current example flows are:
+The current showcase flows are:
 
 - BizTalk-style bank file migration
 - Drasi-enhanced change reaction
@@ -488,20 +490,23 @@ The current example flows are:
 
 For an overview of the connector model and how to add new connectors, see the [Connector model](#connector-model) section above.
 
-| Connector | What it does | Fail-closed behavior | Compensation |
-|-----------|-------------|---------------------|-------------|
-| `platform_health` | Validates platform connectivity and readiness | Fails step if any health check returns unhealthy | No-op (read-only) |
-| `rest` | Executes HTTP requests to external APIs | Fails step if required URL, auth, or headers are missing | Calls `compensateUrl` if configured, otherwise no-op |
-| `ms_graph_notify` | Sends Teams channel messages and Outlook emails via Microsoft Graph (managed identity) | Fails step if target-specific fields are missing or Graph call fails | No-op (external notifications are not auto-retracted) |
-| `queue` | Sends or receives messages from queue systems | Fails step if queue connection or credentials are invalid | No-op (messages cannot be recalled) |
-| `azure_blob` | Reads or writes objects in blob storage | Fails step if storage account or container config is missing | No-op (deletion is destructive) |
-| `sftp` | Transfers files over SFTP | Fails step if host, credentials, or path config is missing | No-op (deletion is destructive) |
-| `erp` | Executes ERP integration steps | Fails step if ERP connection or required fields are missing | Calls `compensateUrl` if configured, otherwise no-op |
-| `transform` | Reshapes JSON between steps with dot-notation field mapping | Fails step if `map` config is present but not a JSON object | Restores original input (pure data, fully reversible) |
-| `azure_compute` | Resizes VM, VMSS, and App Service Plan via ARM API | Fails step if subscription, resource group, or target SKU is missing | Restores previous SKU from `stateBlob` captured by prior get-step |
-| `azure_sql` | Resizes SQL Database and Elastic Pool via ARM API | Fails step if subscription, resource group, or target SKU is missing | Restores previous SKU from `stateBlob` captured by prior get-step |
+| Connector         | What it does                                                                                                                                                                      | Fail-closed behavior                                                                                                    | Compensation                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `platform_health` | Validates platform connectivity and readiness (`health-check`), or polls `/health` and alerts via `ms_graph_notify` if Drasi's heartbeat has gone stale (`drasi-heartbeat-check`) | Fails step if any health check returns unhealthy, or if `drasi-heartbeat-check`'s `healthUrl`/`alert` config is missing | No-op for `health-check`; `drasi-heartbeat-check` may have already sent a real alert, not retractable |
+| `rest`            | Executes HTTP requests to external APIs                                                                                                                                           | Fails step if required URL, auth, or headers are missing                                                                | Calls `compensateUrl` if configured, otherwise no-op                                                  |
+| `ms_graph_notify` | Sends Teams channel messages and Outlook emails via Microsoft Graph (managed identity)                                                                                            | Fails step if target-specific fields are missing or Graph call fails                                                    | No-op (external notifications are not auto-retracted)                                                 |
+| `queue`           | Sends or receives messages from queue systems                                                                                                                                     | Fails step if queue connection or credentials are invalid                                                               | No-op (messages cannot be recalled)                                                                   |
+| `azure_blob`      | Reads or writes objects in blob storage                                                                                                                                           | Fails step if storage account or container config is missing                                                            | No-op (deletion is destructive)                                                                       |
+| `sftp`            | Transfers files over SFTP                                                                                                                                                         | Fails step if host, credentials, or path config is missing                                                              | No-op (deletion is destructive)                                                                       |
+| `erp`             | Executes ERP integration steps                                                                                                                                                    | Fails step if ERP connection or required fields are missing                                                             | Calls `compensateUrl` if configured, otherwise no-op                                                  |
+| `transform`       | Reshapes JSON between steps with dot-notation field mapping                                                                                                                       | Fails step if `map` config is present but not a JSON object                                                             | Restores original input (pure data, fully reversible)                                                 |
+| `azure_compute`   | Resizes VM, VMSS, and App Service Plan via ARM API                                                                                                                                | Fails step if subscription, resource group, or target SKU is missing                                                    | Restores previous SKU from `stateBlob` captured by prior get-step                                     |
+| `azure_sql`       | Resizes SQL Database and Elastic Pool via ARM API                                                                                                                                 | Fails step if subscription, resource group, or target SKU is missing                                                    | Restores previous SKU from `stateBlob` captured by prior get-step                                     |
+| `ftp`             | Transfers files over plain (unencrypted) FTP, for endpoints with no SSH server                                                                                                    | Fails step if host, username, or path config is missing                                                                 | No-op (deletion is destructive)                                                                       |
+| `batch_window`    | Correlates arrivals sharing a `windowKey` into one window, released by time or `expectedCount`                                                                                    | Fails step if `windowKey`, `jobId`, `windowMinutes`, or the internal API URL is missing                                 | No-op (item already merged into a shared window)                                                      |
 
 Each connector execution is governed by:
+
 - Use an idempotency key derived from run ID + step ID; re-executing the same step produces the same outcome.
 - Target replay via `target.replay.stepIds` to select which step(s) to re-execute; other steps in the run are untouched.
 - Validate schemas using optional `inputSchema` and `outputSchema` fields that validate payloads before and after connector execution. Fails the step at the pipeline boundary, never inside the connector.
@@ -532,6 +537,9 @@ Set required AZD environment values before provisioning/deploy:
 - `EXECUTION_LEDGER_ENTRA_AUDIENCE`
 - `EXECUTION_LEDGER_WORKER_WEBHOOK_URL`
 - `EXECUTION_LEDGER_API_INTERNAL_URL` (optional; enables Drasi → API schedule-enqueue catch-up path; set to `https://<api-container-app>.internal.<env>.<region>.azurecontainerapps.io/platform/internal/schedules/due`)
+- `EXECUTION_LEDGER_API_INTERNAL_BATCH_WINDOWS_DUE_URL` (optional; enables Drasi → API batch-window release path; set to the same internal host with `/platform/internal/batch-windows/due`)
+- `EXECUTION_LEDGER_API_INTERNAL_BATCH_WINDOWS_ADD_ITEM_URL` (required if using the `batch_window` connector; set to `/platform/internal/batch-windows/add-item` on the same internal host, or pass `apiUrl` per-step in job config instead)
+- `EXECUTION_LEDGER_API_HEALTH_URL` (required if using the `platform_health.drasi-heartbeat-check` action; the platform's own `/health` URL, or pass `healthUrl` per-step in job config instead)
 - `EXECUTION_LEDGER_APIM_GATEWAY_SECRET` (optional)
 - `EXECUTION_LEDGER_APIM_PUBLISHER_NAME`
 - `EXECUTION_LEDGER_APIM_PUBLISHER_EMAIL`
@@ -582,7 +590,7 @@ curl -sSX POST -H "Authorization: Bearer $TOKEN" \
   -d '{"definition_id":"hello-world.health-and-echo","triggered_by":"cli-smoke-test"}' \
   "$APIM_URL/execution-ledger/platform/jobs/trigger" | jq .
 
-# 6. List runs after trigger, confirm the new run appears
+# 6. List runs after trigger to confirm the new run appears
 RUN_ID=$(curl -sS -H "Authorization: Bearer $TOKEN" \
   "$APIM_URL/execution-ledger/platform/jobs?limit=1" | jq -r '.[0].id // empty')
 
@@ -622,11 +630,11 @@ Invoke-RestMethod -H @{Authorization="Bearer $token"} `
 
 **Expected outcomes:**
 
-| Step | Expected response |
-|------|-------------------|
-| `/health` | `{"status":"ok","environment":"<env>"}` |
-| `GET /platform/jobs` | `[]` on a fresh deploy; array of run objects after trigger |
-| `POST /platform/jobs/trigger` | `{"id":"<uuid>"}` (run ID) or `202 Accepted` |
+| Step                            | Expected response                                                  |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `/health`                       | `{"status":"ok","environment":"<env>"}`                            |
+| `GET /platform/jobs`            | `[]` on a fresh deploy; array of run objects after trigger         |
+| `POST /platform/jobs/trigger`   | `{"id":"<uuid>"}` (run ID) or `202 Accepted`                       |
 | `GET /platform/jobs/{id}/steps` | Array of step records with `status`, `connector`, `attempt` fields |
 
 If you get 401: run `azd env get-value EXECUTION_LEDGER_ENTRA_AUDIENCE` and confirm it matches the `aud` claim in your token (decode at [jwt.ms](https://jwt.ms)). If they differ, re-run `infra/scripts/Add-DeployingUserToAdminGroup.ps1` to resync.
@@ -649,59 +657,49 @@ npm run tauri dev    # dev build with hot reload
 **First-time connection setup:**
 
 1. In the **Connection** panel, set:
-   - **API base URL**: the APIM gateway URL from `azd env get-value apimGatewayUrl`, with the `/execution-ledger` prefix. Example: `https://apim-<name>.azure-api.net/execution-ledger`
-   - **Bearer token**: acquire with `az account get-access-token --resource <ID_URI> --query accessToken --output tsv` where `ID_URI` = output of `az ad app show --id $(azd env get-value EXECUTION_LEDGER_ENTRA_AUDIENCE) --query identifierUris[0] -o tsv`
-   - **Gateway secret**: only if your deploy set `EXECUTION_LEDGER_APIM_GATEWAY_SECRET`
-2. Click **Check API**. Expects `status: ok`.
-3. Click **Refresh runs**. Confirms authenticated platform access.
+
+- **API base URL**: the APIM gateway URL from `azd env get-value apimGatewayUrl`, with the `/execution-ledger` prefix (for example, `https://apim-<name>.azure-api.net/execution-ledger`)
+- **Bearer token**: acquire with `az account get-access-token --resource <ID_URI> --query accessToken --output tsv` where `ID_URI` = output of `az ad app show --id $(azd env get-value EXECUTION_LEDGER_ENTRA_AUDIENCE) --query identifierUris[0] -o tsv`
+- **Gateway secret**: only if your deploy set `EXECUTION_LEDGER_APIM_GATEWAY_SECRET`
+
+2. Click **Check API**. Expect `status: ok`.
+3. Click **Refresh runs** to confirm authenticated platform access.
 
 **Functional test flow:**
 
 1. Go to **Manual trigger**, enter definition ID `hello-world.health-and-echo`, submit.
 2. Click **Refresh runs**. The new run should appear at the top with status `running` or `completed`.
-3. Click the run row, then the **Steps** tab. Confirms step records with connector, status, and attempt number.
+3. Click the run row → **Steps** tab to confirm step records with connector, status, and attempt number.
 4. Try **Replay** on a completed step to verify idempotent re-execution.
 5. Go to **Operations** → **Recover runs** to verify the recovery endpoint returns without error.
 
-**Example scenario flows:**
+**Scenario showcase flows:**
 
-| Scenario | Definition ID | What it exercises |
-|----------|---------------|-------------------|
-| BizTalk bank file migration | `migration.biztalk.bank-file` | Multi-step REST + blob connector chain |
-| Drasi change reaction | `drasi.orders.change-reaction` | WAL-event triggered run with schema validation |
+| Scenario                    | Definition ID                  | What it exercises                              |
+| --------------------------- | ------------------------------ | ---------------------------------------------- |
+| BizTalk bank file migration | `migration.biztalk.bank-file`  | Multi-step REST + blob connector chain         |
+| Drasi change reaction       | `drasi.orders.change-reaction` | WAL-event triggered run with schema validation |
 
-Tokens entered in the UI are held in process memory only; the app does not persist secrets to disk or local storage.
+Tokens entered in the UI are held in process memory only. The app does not persist secrets to disk or local storage.
 
 ### Operational proof scripts
 
 Run these after any deploy to confirm end-to-end health:
 
 ```powershell
-# Resource names come from your azd deployment, e.g. `azd env get-values`
-$rg = "rg-<your-env-name>"
-$common = @{
-    ResourceGroupName          = $rg
-    ContainerAppApiName        = "<env-name>-api"
-    ContainerAppWorkerName     = "<env-name>-worker"
-    ContainerAppSchedulerName  = "<env-name>-scheduler"
-    ServiceBusNamespaceName    = "sb-<env-name>-<token>"
-    PostgresServerName         = "pg-<env-name>-<token>"
-}
-
 # Full baseline + collect pass
-.\execution-ledger\scripts\Invoke-OperationalProofRun.ps1 -Stages baseline,collect @common
+.\execution-ledger\scripts\Invoke-OperationalProofRun.ps1 -Stages baseline,collect
 
 # DR integrity gate
-.\execution-ledger\scripts\Invoke-DrIntegrityPass.ps1 @common
+.\execution-ledger\scripts\Invoke-DrIntegrityPass.ps1
 
 # Capacity and cost gate
-.\execution-ledger\scripts\Invoke-CapacityCostGate.ps1 @common -ContainerRegistryName "<your-acr-name>" -LogAnalyticsWorkspaceName "law-<env-name>"
+.\execution-ledger\scripts\Invoke-CapacityCostGate.ps1
 ```
 
 All three must exit with `overallStatus: Succeeded` / `gate=pass` before a deploy is considered complete.
 
 ### Chaos testing (Service Bus fault path)
-
 
 A Chaos Studio experiment was added and exercised against the Service Bus namespace to test queue-state fault handling on `execution-ledger-intents`.
 

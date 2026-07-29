@@ -18,15 +18,15 @@ We aim to acknowledge reports within a few business days. Coordinated disclosure
 This project handles Azure credentials and secrets (Entra ID tokens, managed identity, Key Vault references, Service Bus and PostgreSQL connection details) as part of its normal operation. Vulnerability categories of particular interest:
 
 - Authentication or authorization bypass in the API (Entra JWT validation, tenant scoping, MCP scope enforcement).
-- Cross-tenant data leakage — any path where one tenant can read, replay, skip, or compensate another tenant's runs.
-- Secret exposure — credentials or tokens appearing in logs, error responses, or step outputs.
+- Cross-tenant data leakage: any path where one tenant can read, replay, skip, or compensate another tenant's runs.
+- Secret exposure: credentials or tokens appearing in logs, error responses, or step outputs.
 - Injection in connector-step execution (path traversal in the `sftp`/`azure_blob` connectors, SSRF via the `rest`/`erp` connectors bypassing the header denylist, unsafe deserialization).
 - Privilege escalation through connector-pack job templates or the MCP tool surface.
 
 ## Not in scope
 
 - Vulnerabilities requiring physical access to a deployed environment.
-- Issues in third-party dependencies — please report those to the upstream project directly, though we're glad to hear about them too so we can track an upgrade.
+- Issues in third-party dependencies: please report those to the upstream project directly, though we're glad to hear about them too so we can track an upgrade.
 - Denial-of-service reports without a concrete resource-exhaustion mechanism.
 
 ## Supported versions

@@ -3,6 +3,7 @@
 //! Each module owns its request/response types and handler functions.
 //! Shared types (like `ListRunsQuery`) live in the parent `main.rs`.
 
+pub(super) mod batch_windows;
 pub(super) mod health;
 pub(super) mod jobs;
 pub(super) mod platform;

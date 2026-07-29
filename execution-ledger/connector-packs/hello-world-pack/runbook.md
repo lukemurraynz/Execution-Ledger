@@ -44,8 +44,30 @@ curl -X POST https://<api-host>/platform/jobs/trigger \
 
 ## Failure modes
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `health-check` fails | Database unreachable or schema not bootstrapped | Check `EXECUTION_LEDGER_DATABASE_URL` and run `db-status` |
-| `rest-echo` fails with `InvalidConfiguration` | REST connector missing required config | The hello-world pack requires no config; check worker logs |
-| Run stays in `pending` | Worker not running or queue engine mismatch | Verify worker process and `EXECUTION_LEDGER_QUEUE_ENGINE` |
+| Symptom                                       | Likely cause                                    | Fix                                                        |
+| --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
+| `health-check` fails                          | Database unreachable or schema not bootstrapped | Check `EXECUTION_LEDGER_DATABASE_URL` and run `db-status`  |
+| `rest-echo` fails with `InvalidConfiguration` | REST connector missing required config          | The hello-world pack requires no config; check worker logs |
+| Run stays in `pending`                        | Worker not running or queue engine mismatch     | Verify worker process and `EXECUTION_LEDGER_QUEUE_ENGINE`  |
+
+## Drasi degraded-mode backstop (`hello-world.drasi-heartbeat-check`)
+
+`jobs/drasi-heartbeat-check.json` schedules the independent backstop for
+silent Drasi degradation. Drasi cannot monitor its own absence, so this job
+runs on the ordinary scheduler+worker path (unrelated to Drasi) and alerts
+via `ms_graph_notify` when `/health` reports `status: "degraded"`, i.e.
+the `drasi:heartbeat` KV entry `execution-ledger-drasi` writes every ~60s
+has expired.
+
+Register it on a schedule (e.g. every 5 minutes) so it actually runs
+continuously rather than once:
+
+```bash
+cargo run -p execution-ledger-cli -- job-schedules-release \
+  hello-world-drasi-heartbeat hello-world.drasi-heartbeat-check "*/5 * * * *"
+```
+
+Fill in `healthUrl` and the `alert` mailbox/distribution-list fields in
+`jobs/drasi-heartbeat-check.json` before deploying; both are required
+config, validated eagerly so a bad alert target is caught in testing
+rather than during a real Drasi outage.

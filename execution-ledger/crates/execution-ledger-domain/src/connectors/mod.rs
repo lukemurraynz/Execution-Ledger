@@ -100,6 +100,8 @@
 //! | `pgp` | `pgp` | Encrypts/signs or decrypts/verifies a payload with OpenPGP |
 //! | `blob_archive` | `blob_archive` | Zips/unzips content between blob containers |
 //! | `http_download` | `http_download` | Downloads a URL's bytes into the pipeline as base64, or PUTs upstream bytes to a URL (`upload` action) |
+//! | `ftp` | `ftp` | Transfers files over plain FTP (for endpoints with no SSH server) |
+//! | `batch_window` | `batch_window` | Correlates arrivals sharing a key into one window, released by time or count |
 
 pub mod contracts;
 pub mod helpers;
@@ -107,8 +109,10 @@ pub mod helpers;
 mod arm;
 mod azure_compute;
 mod azure_sql;
+mod batch_window;
 mod blob;
 mod blob_archive;
+mod ftp;
 mod http_download;
 mod ms_graph_notify;
 mod pgp;
@@ -147,6 +151,8 @@ pub enum ConnectorKind {
     Pgp,
     BlobArchive,
     HttpDownload,
+    Ftp,
+    BatchWindow,
 }
 
 /// A single step within a job run, defining which connector to execute
@@ -221,7 +227,13 @@ pub async fn execute_step(
     }
 
     let output = match step.connector {
-        ConnectorKind::PlatformHealth => platform_health::execute(ctx, step).await,
+        ConnectorKind::PlatformHealth => match step.action.as_deref() {
+            None | Some("health-check") => platform_health::execute(ctx, step).await,
+            Some("drasi-heartbeat-check") => platform_health::drasi_heartbeat_check(ctx, step).await,
+            Some(action) => Err(ExecutionLedgerError::InvalidConfiguration {
+                name: format!("connector.platform_health.action ('{action}')"),
+            }),
+        },
         ConnectorKind::Rest => rest::execute("rest", ctx, step).await,
         ConnectorKind::Erp => rest::execute("erp", ctx, step).await,
         ConnectorKind::MsGraphNotify => ms_graph_notify::execute(ctx, step).await,
@@ -287,6 +299,19 @@ pub async fn execute_step(
                 name: format!("connector.http_download.action ('{action}')"),
             }),
         },
+        ConnectorKind::Ftp => match step.action.as_deref() {
+            None | Some("upload") => ftp::execute(ctx, step).await,
+            Some("download") => ftp::download(ctx, step).await,
+            Some(action) => Err(ExecutionLedgerError::InvalidConfiguration {
+                name: format!("connector.ftp.action ('{action}')"),
+            }),
+        },
+        ConnectorKind::BatchWindow => match step.action.as_deref() {
+            None | Some("add-item") => batch_window::add_item(ctx, step).await,
+            Some(action) => Err(ExecutionLedgerError::InvalidConfiguration {
+                name: format!("connector.batch_window.action ('{action}')"),
+            }),
+        },
     }?;
 
     // Validate output against the step's output schema, if one is defined.
@@ -298,6 +323,27 @@ pub async fn execute_step(
     }
 
     Ok(output)
+}
+
+/// Proves the platform can reach and authenticate to a connector's target
+/// endpoint, without transferring anything or otherwise causing a real side
+/// effect. Used by `execution-ledger-cli`'s `preflight` command so a bad
+/// host, credential, or key is caught before go-live rather than at 5am on
+/// day one.
+///
+/// Only connectors with a real network endpoint to test support this
+/// (`sftp`, `ftp` today); other kinds return `InvalidConfiguration`.
+pub async fn test_connectivity(
+    kind: ConnectorKind,
+    step: &ConnectorStep,
+) -> Result<Value, ExecutionLedgerError> {
+    match kind {
+        ConnectorKind::Sftp => sftp::test_connection(step).await,
+        ConnectorKind::Ftp => ftp::test_connection(step).await,
+        other => Err(ExecutionLedgerError::InvalidConfiguration {
+            name: format!("connectivity test not supported for connector '{other:?}'"),
+        }),
+    }
 }
 
 /// Compensate a previously-executed connector step by dispatching to the
@@ -340,6 +386,8 @@ pub async fn compensate_step(
         ConnectorKind::Pgp => pgp::compensate(ctx, step, original_output).await,
         ConnectorKind::BlobArchive => blob_archive::compensate(ctx, step, original_output).await,
         ConnectorKind::HttpDownload => http_download::compensate(ctx, step, original_output).await,
+        ConnectorKind::Ftp => ftp::compensate(ctx, step, original_output).await,
+        ConnectorKind::BatchWindow => batch_window::compensate(ctx, step, original_output).await,
     }
 }
 

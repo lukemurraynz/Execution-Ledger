@@ -40,6 +40,9 @@ pub fn consumes_upstream_output(kind: ConnectorKind, action: Option<&str>) -> bo
     match kind {
         ConnectorKind::AzureBlob => true,
         ConnectorKind::Sftp => matches!(action, None | Some("download" | "upload")),
+        ConnectorKind::Ftp => matches!(action, None | Some("download" | "upload")),
+        // Writes its own `input`, not upstream_output — see connectors/batch_window.rs.
+        ConnectorKind::BatchWindow => false,
         ConnectorKind::Pgp => true,
         ConnectorKind::HttpDownload => true,
         ConnectorKind::BlobArchive => false, // owns its own blob I/O — deliberate, see module doc
@@ -125,16 +128,24 @@ pub fn compensation_behavior(kind: ConnectorKind, action: Option<&str>) -> Compe
         }
         ConnectorKind::AzureBlob => CompensationBehavior::NoopIrreversible, // deleting is destructive
         ConnectorKind::MsGraphNotify => CompensationBehavior::NoopIrreversible, // already sent
-        ConnectorKind::Sftp => match action {
+        ConnectorKind::Sftp | ConnectorKind::Ftp => match action {
             Some("download") => CompensationBehavior::NoopReadOnly,
             _ => CompensationBehavior::NoopIrreversible, // upload: deleting is destructive
         },
         ConnectorKind::BlobArchive => CompensationBehavior::NoopIrreversible, // deleting is destructive
+        // The item is already merged into a window other arrivals may share
+        // — nothing to safely remove. See connectors/batch_window.rs.
+        ConnectorKind::BatchWindow => CompensationBehavior::NoopIrreversible,
         ConnectorKind::HttpDownload => match action {
             Some("upload") => CompensationBehavior::NoopIrreversible,
             _ => CompensationBehavior::NoopReadOnly, // download is read-only
         },
-        ConnectorKind::PlatformHealth => CompensationBehavior::NoopReadOnly,
+        // `drasi-heartbeat-check` may have sent a real alert if degraded —
+        // same reasoning as MsGraphNotify. Plain health-check has nothing.
+        ConnectorKind::PlatformHealth => match action {
+            Some("drasi-heartbeat-check") => CompensationBehavior::NoopIrreversible,
+            _ => CompensationBehavior::NoopReadOnly,
+        },
         ConnectorKind::Pgp => CompensationBehavior::NoopReadOnly, // pure transform, no side effect of its own
         ConnectorKind::Transform => CompensationBehavior::NoopReadOnly, // pure transform, no side effect
     }
@@ -168,7 +179,12 @@ pub enum ReplaySafety {
 #[allow(clippy::match_same_arms)] // see consumes_upstream_output's note — deliberate, not redundant
 pub fn replay_safety(kind: ConnectorKind, action: Option<&str>) -> ReplaySafety {
     match kind {
-        ConnectorKind::PlatformHealth => ReplaySafety::Idempotent,
+        // `drasi-heartbeat-check` sends a real Teams/email alert when
+        // degraded — re-running it re-sends. Plain health-check is read-only.
+        ConnectorKind::PlatformHealth => match action {
+            Some("drasi-heartbeat-check") => ReplaySafety::NotSafeWithoutGuard,
+            _ => ReplaySafety::Idempotent,
+        },
         // Generic HTTP calls to a caller-specified endpoint: this platform
         // has no way to know whether the target treats a repeat call as
         // idempotent (a POST that creates a new record will duplicate it).
@@ -182,10 +198,10 @@ pub fn replay_safety(kind: ConnectorKind, action: Option<&str>) -> ReplaySafety 
         ConnectorKind::AzureBlob => ReplaySafety::Idempotent,
         // A real Teams/email notification is sent again on replay.
         ConnectorKind::MsGraphNotify => ReplaySafety::NotSafeWithoutGuard,
-        ConnectorKind::Sftp => match action {
+        ConnectorKind::Sftp | ConnectorKind::Ftp => match action {
             Some("download") => ReplaySafety::Idempotent,
-            // Re-uploading to a partner SFTP drop commonly re-triggers that
-            // partner's own file-arrival processing — treat conservatively.
+            // Re-uploading to a partner SFTP/FTP drop commonly re-triggers
+            // that partner's own file-arrival processing — treat conservatively.
             _ => ReplaySafety::NotSafeWithoutGuard,
         },
         // ARM resize/get operations are declarative (set desired state);
@@ -198,6 +214,9 @@ pub fn replay_safety(kind: ConnectorKind, action: Option<&str>) -> ReplaySafety 
         // Both actions are overwrite/read-only by design: `upload` PUTs to a
         // fixed URL (not a POST-create), `download` is read-only.
         ConnectorKind::HttpDownload => ReplaySafety::Idempotent,
+        // Re-adding an item appends it to the window's `items` array again —
+        // not deduplicated by content, so a replay double-counts the arrival.
+        ConnectorKind::BatchWindow => ReplaySafety::NotSafeWithoutGuard,
     }
 }
 
@@ -301,16 +320,24 @@ pub fn credential_posture(kind: ConnectorKind) -> CredentialPosture {
         | ConnectorKind::BlobArchive
         | ConnectorKind::MsGraphNotify
         | ConnectorKind::Queue => CredentialPosture::ManagedIdentityOnly,
-        ConnectorKind::Sftp | ConnectorKind::Pgp => CredentialPosture::AcceptsCredentialConfig,
+        ConnectorKind::Sftp | ConnectorKind::Ftp | ConnectorKind::Pgp => {
+            CredentialPosture::AcceptsCredentialConfig
+        }
         // `rest`/`erp` explicitly denylist forwarding an Authorization/Cookie
         // header from step config (see rest.rs's DENYLISTED_HEADERS) — by
         // design, these connectors cannot carry a caller-supplied credential
         // to the target at all.
+        // Its bearer token comes from a trusted platform env var
+        // (`EXECUTION_LEDGER_APIM_GATEWAY_SECRET`), never from step config —
+        // a job author cannot supply or override a credential here, which is
+        // the property this posture is meant to capture, even though (unlike
+        // the other NoAuth connectors) a token is actually attached.
         ConnectorKind::Rest
         | ConnectorKind::Erp
         | ConnectorKind::HttpDownload
         | ConnectorKind::PlatformHealth
-        | ConnectorKind::Transform => CredentialPosture::NoAuth,
+        | ConnectorKind::Transform
+        | ConnectorKind::BatchWindow => CredentialPosture::NoAuth,
     }
 }
 

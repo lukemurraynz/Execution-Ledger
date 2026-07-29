@@ -6,19 +6,19 @@ The `azure-compute-scale` pack provides scheduled and metric-reactive autoscalin
 
 ## Jobs
 
-| Job | Trigger | Action |
-|-----|---------|--------|
-| `azure-compute-scale.weekend-scale-down` | Cron (Fri 8pm) | Resize VMSS to `Standard_B2s`, 1 replica |
-| `azure-compute-scale.weekend-scale-up` | Cron (Mon 7am) | Resize VMSS to `Standard_D8s_v3`, 3 replicas |
-| `azure-compute-scale.metric-reactive-scale-down` | Drasi (Event Hub) | Resize VMSS to `Standard_B2s`, 1 replica |
-| `azure-compute-scale.metric-reactive-scale-up` | Drasi (Event Hub) | Resize VMSS to `Standard_D8s_v3`, 5 replicas |
-| `azure-compute-scale.emergency-scale-up` | Ops (manual) | Resize VMSS to `Standard_D16s_v3`, 10 replicas |
+| Job                                              | Trigger           | Action                                         |
+| ------------------------------------------------ | ----------------- | ---------------------------------------------- |
+| `azure-compute-scale.weekend-scale-down`         | Cron (Fri 8pm)    | Resize VMSS to `Standard_B2s`, 1 replica       |
+| `azure-compute-scale.weekend-scale-up`           | Cron (Mon 7am)    | Resize VMSS to `Standard_D8s_v3`, 3 replicas   |
+| `azure-compute-scale.metric-reactive-scale-down` | Drasi (Event Hub) | Resize VMSS to `Standard_B2s`, 1 replica       |
+| `azure-compute-scale.metric-reactive-scale-up`   | Drasi (Event Hub) | Resize VMSS to `Standard_D8s_v3`, 5 replicas   |
+| `azure-compute-scale.emergency-scale-up`         | Ops (manual)      | Resize VMSS to `Standard_D16s_v3`, 10 replicas |
 
 ## RBAC Requirements
 
 This pack needs **one UAMI per deployment scope** (e.g., one for prod, one for staging). Create the UAMI and assign roles before deploying the pack.
 
-### Step 1 — Create the UAMI
+### Step 1: Create the UAMI
 
 ```bash
 # Create a dedicated UAMI for azure-compute-scale
@@ -33,12 +33,12 @@ AZURE_COMPUTE_MI_CLIENT_ID=$(az identity show \
   --query clientId -o tsv)
 ```
 
-### Step 2 — Assign only the roles this pack needs
+### Step 2: Assign only the roles this pack needs
 
-| Role | Scope | Why |
-|------|-------|-----|
+| Role                                    | Scope     | Why                                 |
+| --------------------------------------- | --------- | ----------------------------------- |
 | `Virtual Machine Scale Set Contributor` | Target RG | Resize VMSS and change SKU/capacity |
-| `Reader` | Target RG | Read instance view before scale |
+| `Reader`                                | Target RG | Read instance view before scale     |
 
 ```bash
 az role assignment create \
@@ -52,7 +52,7 @@ az role assignment create \
   --scope "/subscriptions/<sub>/resourceGroups/<rg>"
 ```
 
-### Step 3 — Store client ID in App Configuration
+### Step 3: Store client ID in App Configuration
 
 ```bash
 az appconfig kv set \
@@ -62,7 +62,7 @@ az appconfig kv set \
   --subscription <sub>
 ```
 
-### Step 4 — Reference in pack.json
+### Step 4: Reference in pack.json
 
 ```json
 {
@@ -76,7 +76,7 @@ az appconfig kv set \
 }
 ```
 
-> **Why separate UAMIs?** A compromised connector step running under a broad MSI can affect any resource in the subscription. The `azure-compute-scale` UAMI has only `Virtual Machine Scale Set Contributor` + `Reader` on its target RG — it cannot touch SQL resources, storage accounts, or other tenants. See the [connector-packs README](../../README.md#user-assigned-msi-and-least-privilege-rbac) for the full pattern.
+> **Why separate UAMIs?** A compromised connector step running under a broad MSI can affect any resource in the subscription. The `azure-compute-scale` UAMI has only `Virtual Machine Scale Set Contributor` + `Reader` on its target RG, so it cannot touch SQL resources, storage accounts, or other tenants. See the [connector-packs README](../../README.md#user-assigned-msi-and-least-privilege-rbac) for the full pattern.
 
 ## Preflight Checks
 
@@ -90,22 +90,26 @@ Before enabling any scale job:
 ## Failure Handling
 
 ### Step fails with `InvalidConfiguration`
+
 The connector config is wrong: missing `subscriptionId`, `resourceGroup`, or target name. Fix the job JSON and re-trigger. The step is idempotent so re-triggering is safe.
 
 ### Step fails with `DependencyFailed` (ARM returns non-2xx)
+
 Common causes:
+
 - SKU name is not valid in the region → use `az vm list-sizes --location <loc>` to find valid names.
 - RBAC role missing → grant the role and replay the step.
 - Resource does not exist → verify the resource name and re-create if needed.
 
 ### Step succeeds but ARM async operation fails
+
 ARM compute operations are often async. The connector polls the `Azure-AsyncOperation` header until completion or timeout. If the async operation fails, the step returns the async operation's error: check `response.provisioningState` in the step output.
 
 ## Replay and Skip
 
 - **Replay**: `job-replay <tenant-id> <run-id> <step-id>` re-executes only the named step. Safe to replay a scale step: the ARM API is idempotent for resize.
 - **Skip**: `job-skip <tenant-id> <run-id> <reason>` marks the step as skipped without executing. Use this when a schedule fires but ops has already manually scaled.
-- **Compensate**: `job-compensate <tenant-id> <run-id>` rolls back by re-applying the previous SKU. The previous SKU is captured automatically from the prior `vmss-get`/`appservice-get` step via step-to-step data flow (`stateBlob` in the resize step's output). No manual `previousSku` field is needed — just include a get-step before every resize in the job definition.
+- **Compensate**: `job-compensate <tenant-id> <run-id>` rolls back by re-applying the previous SKU. The previous SKU is captured automatically from the prior `vmss-get`/`appservice-get` step via step-to-step data flow (`stateBlob` in the resize step's output). No manual `previousSku` field is needed; include a get-step before every resize in the job definition.
 
 ## Weekend Scale-Down Procedure
 
@@ -146,6 +150,7 @@ All scale steps emit:
 ```
 
 Query Log Analytics for scale events:
+
 ```kql
 ExecutionLedger_CL
 | where CorrelationId_s == "<correlation-id>"
@@ -159,7 +164,7 @@ Oscillation: a resource that scales up, then immediately scales down again withi
 ### KQL: Count scale events per resource in rolling hour
 
 ```kql
-// Alert when VMSS scales more than 3 times in 1 hour — possible oscillation
+// Alert when VMSS scales more than 3 times in 1 hour; possible oscillation
 ExecutionLedger_CL
 | where StepId_s contains "scale"
   and Action_s == "vmss-resize"
@@ -228,9 +233,9 @@ Drasi continuous query watches the Event Hub for sustained low-CPU events and tr
 
 ## RBAC quick reference
 
-| Role | Scope | Required for |
-|------|-------|-------------|
-| Reader | Subscription | Finding resources by tag |
-| Virtual Machine Scale Set Contributor | Resource Group | VMSS resize |
-| Web Plan Contributor | Resource Group | App Service Plan resize |
-| Log Analytics Reader | Workspace | KQL oscillation checks |
+| Role                                  | Scope          | Required for             |
+| ------------------------------------- | -------------- | ------------------------ |
+| Reader                                | Subscription   | Finding resources by tag |
+| Virtual Machine Scale Set Contributor | Resource Group | VMSS resize              |
+| Web Plan Contributor                  | Resource Group | App Service Plan resize  |
+| Log Analytics Reader                  | Workspace      | KQL oscillation checks   |

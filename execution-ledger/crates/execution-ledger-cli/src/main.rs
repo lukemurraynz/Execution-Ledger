@@ -553,6 +553,8 @@ async fn run_preflight(
     pool: &sqlx::PgPool,
     servicebus_client: Option<&queue::ServiceBusQueueClient>,
 ) -> anyhow::Result<()> {
+    use execution_ledger_domain::connectors::{ConnectorKind, ConnectorStep, test_connectivity};
+
     let mut checks: Vec<PreflightCheck> = Vec::new();
     let mut all_passed = true;
 
@@ -633,6 +635,13 @@ async fn run_preflight(
                 "EXECUTION_LEDGER_SFTP_USERNAME",
             ],
         ),
+        (
+            "ftp",
+            vec![
+                "EXECUTION_LEDGER_FTP_HOST",
+                "EXECUTION_LEDGER_FTP_USERNAME",
+            ],
+        ),
         ("erp", vec!["EXECUTION_LEDGER_ERP_ENDPOINT"]),
     ]);
 
@@ -643,23 +652,89 @@ async fn run_preflight(
             .copied()
             .collect();
 
-        if missing.is_empty() {
-            checks.push(PreflightCheck {
-                name: format!("Connector: {connector}"),
-                status: "ok",
-                detail: "ready".to_string(),
-            });
-        } else {
+        if !missing.is_empty() {
             all_passed = false;
             checks.push(PreflightCheck {
                 name: format!("Connector: {connector}"),
                 status: "error",
                 detail: format!("missing: {}", missing.join(", ")),
             });
+            continue;
+        }
+
+        checks.push(PreflightCheck {
+            name: format!("Connector: {connector}"),
+            status: "ok",
+            detail: "ready".to_string(),
+        });
+
+        let Some(kind) = (match *connector {
+            "sftp" => Some(ConnectorKind::Sftp),
+            "ftp" => Some(ConnectorKind::Ftp),
+            _ => None,
+        }) else {
+            continue;
+        };
+
+        // Env vars present doesn't mean the endpoint is actually reachable —
+        // a bad host, port, or credential only shows up here, not in the
+        // presence check above. Attempt a real connect-and-authenticate (no
+        // file transfer) so that's caught now, not at 5am on day one
+        // against a live branch endpoint.
+        let probe_step = ConnectorStep {
+            id: format!("preflight-{connector}"),
+            connector: kind,
+            action: None,
+            external_id: None,
+            input: Value::Null,
+            config: json!({}),
+            input_schema: None,
+            output_schema: None,
+        };
+        match test_connectivity(kind, &probe_step).await {
+            Ok(result) => checks.push(PreflightCheck {
+                name: format!("Connector: {connector} (live)"),
+                status: "ok",
+                detail: format!("connected: {result}"),
+            }),
+            Err(error) => {
+                all_passed = false;
+                checks.push(PreflightCheck {
+                    name: format!("Connector: {connector} (live)"),
+                    status: "error",
+                    detail: format!("configured but unreachable: {error}"),
+                });
+            }
         }
     }
 
-    // 5. Environment mode
+    // 5. Drasi heartbeat freshness (see execution-ledger-drasi's
+    // spawn_heartbeat_writer and the platform_health.drasi-heartbeat-check
+    // connector action). Informational only — a missing/expired heartbeat
+    // in a local/dev environment where Drasi isn't running is expected, not
+    // a preflight blocker; production readiness for this signal is what the
+    // scheduled drasi-heartbeat-check job (see connector-packs/hello-world-pack)
+    // actually gates, not this one-shot check.
+    match db::kv_get(pool, "drasi:heartbeat").await {
+        Ok(Some(_)) => checks.push(PreflightCheck {
+            name: "Drasi heartbeat".to_string(),
+            status: "ok",
+            detail: "fresh (execution-ledger-drasi is running and writing heartbeats)".to_string(),
+        }),
+        Ok(None) => checks.push(PreflightCheck {
+            name: "Drasi heartbeat".to_string(),
+            status: "warn",
+            detail: "missing or expired — execution-ledger-drasi may not be running yet"
+                .to_string(),
+        }),
+        Err(error) => checks.push(PreflightCheck {
+            name: "Drasi heartbeat".to_string(),
+            status: "warn",
+            detail: format!("could not check: {error}"),
+        }),
+    }
+
+    // 6. Environment mode
     checks.push(PreflightCheck {
         name: "Environment".to_string(),
         status: "ok",

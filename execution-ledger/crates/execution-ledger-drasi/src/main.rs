@@ -146,11 +146,46 @@ async fn main() -> anyhow::Result<()> {
         &json!({ "slot_name": drasi_config.source_slot_name }),
     );
 
+    spawn_heartbeat_writer(pool.clone());
+
     tokio::signal::ctrl_c().await?;
     drasi.stop().await?;
     tracing::info!("execution-ledger-drasi: stopped");
 
     Ok(())
+}
+
+/// Writes a `drasi:heartbeat` KV entry every 60s with a 180s TTL (3x the
+/// interval) — Drasi can't monitor its own absence, so this is read by
+/// `execution-ledger-api`'s `/health` (which reports `status: "degraded"`
+/// once the entry has expired) and by the independent
+/// `platform_health.drasi-heartbeat-check` connector action, which runs on
+/// the ordinary scheduler+worker path and alerts even when this process is
+/// fully down. The TTL expiry itself *is* the staleness signal — no
+/// timestamp comparison needed on the reading side, `kv_get` already
+/// filters out expired rows.
+fn spawn_heartbeat_writer(pool: sqlx::PgPool) {
+    const HEARTBEAT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+    const HEARTBEAT_TTL_SECONDS: i64 = 180;
+    const HEARTBEAT_KEY: &str = "drasi:heartbeat";
+
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(HEARTBEAT_INTERVAL);
+        loop {
+            ticker.tick().await;
+            if let Err(error) = execution_ledger_core::db::kv_set(
+                &pool,
+                HEARTBEAT_KEY,
+                &json!({ "source": "execution-ledger-drasi" }),
+                None,
+                Some(HEARTBEAT_TTL_SECONDS),
+            )
+            .await
+            {
+                tracing::warn!(%error, "drasi: heartbeat write failed");
+            }
+        }
+    });
 }
 
 /// Resolve the delivery target: Event Grid (MI auth) or raw webhook.

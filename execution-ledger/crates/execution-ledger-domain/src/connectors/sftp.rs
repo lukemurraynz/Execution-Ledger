@@ -108,7 +108,12 @@ struct SftpTarget {
     passphrase: Option<String>,
 }
 
-fn resolve_target(step: &ConnectorStep) -> Result<SftpTarget, ExecutionLedgerError> {
+/// Resolves host/port/username/auth — everything `connect_and_authenticate`
+/// needs. Does not require `remotePath`, so this is also what
+/// `test_connection` (used by CLI preflight) calls directly: proving the
+/// platform can reach and authenticate to an endpoint doesn't require
+/// naming a specific file on it.
+fn resolve_connection(step: &ConnectorStep) -> Result<SftpTarget, ExecutionLedgerError> {
     let host = step_config_string(step, "host")
         .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_HOST").ok())
         .ok_or(ExecutionLedgerError::InvalidConfiguration {
@@ -134,6 +139,27 @@ fn resolve_target(step: &ConnectorStep) -> Result<SftpTarget, ExecutionLedgerErr
     #[allow(clippy::cast_possible_truncation)] // checked against u16::MAX above
     let port = port_raw as u16;
 
+    let password = step_config_string(step, "password")
+        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PASSWORD").ok());
+    let private_key_path = step_config_string(step, "privateKeyPath")
+        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PRIVATE_KEY_PATH").ok());
+    let passphrase = step_config_string(step, "passphrase")
+        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PASSPHRASE").ok());
+
+    Ok(SftpTarget {
+        host,
+        port,
+        username,
+        remote_path: String::new(),
+        password,
+        private_key_path,
+        passphrase,
+    })
+}
+
+fn resolve_target(step: &ConnectorStep) -> Result<SftpTarget, ExecutionLedgerError> {
+    let mut target = resolve_connection(step)?;
+
     let remote_path = step_config_string(step, "remotePath")
         .or_else(|| input_string(step, "remotePath"))
         .or_else(|| step.external_id.clone())
@@ -148,22 +174,29 @@ fn resolve_target(step: &ConnectorStep) -> Result<SftpTarget, ExecutionLedgerErr
         });
     }
 
-    let password = step_config_string(step, "password")
-        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PASSWORD").ok());
-    let private_key_path = step_config_string(step, "privateKeyPath")
-        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PRIVATE_KEY_PATH").ok());
-    let passphrase = step_config_string(step, "passphrase")
-        .or_else(|| std::env::var("EXECUTION_LEDGER_SFTP_PASSPHRASE").ok());
+    target.remote_path = remote_path;
+    Ok(target)
+}
 
-    Ok(SftpTarget {
-        host,
-        port,
-        username,
-        remote_path,
-        password,
-        private_key_path,
-        passphrase,
-    })
+/// Proves the platform can reach and authenticate to an SFTP endpoint,
+/// without transferring anything. Used by `execution-ledger-cli`'s
+/// `preflight` command — see `connectors::test_connectivity`.
+pub(crate) async fn test_connection(step: &ConnectorStep) -> Result<Value, ExecutionLedgerError> {
+    let target = resolve_connection(step)?;
+    let host_for_log = target.host.clone();
+    let port = target.port;
+
+    let join = task::spawn_blocking(move || {
+        connect_and_authenticate(&target)?;
+        Ok(json!({
+            "connector": "sftp",
+            "connected": true,
+            "host": host_for_log,
+            "port": port
+        }))
+    });
+
+    run_with_timeout(join).await
 }
 
 /// Connects, performs the SSH handshake, and authenticates. Blocking —

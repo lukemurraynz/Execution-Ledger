@@ -11,6 +11,7 @@ Execution Ledger needs to react to PostgreSQL data changes in real time rather t
 Polling introduces latency, wastes compute on unchanged data, and creates scaling pressure at high table volumes. WAL (Write-Ahead Log) streaming provides change detection at the source without query overhead.
 
 Drasi is an open-source reactive engine that provides:
+
 - `drasi-source-postgres`: tails PostgreSQL logical replication slots and emits change events
 - `drasi-reaction-http`: delivers change events to HTTP endpoints (the worker)
 
@@ -94,7 +95,7 @@ ALTER TABLE EXECUTION_LEDGER_jobs_runs REPLICA IDENTITY FULL;
 
 ### Networking
 
-Replication runs over port 5432 — no additional ports. However, long-lived replication connections are sensitive to idle connection drops. If the server sits behind Azure Firewall or an NVA with TCP idle timeouts, raise the timeout above the WAL sender's expected idle period or enable TCP keepalives.
+Replication runs over port 5432 with no additional ports. However, long-lived replication connections are sensitive to idle connection drops. If the server sits behind Azure Firewall or an NVA with TCP idle timeouts, raise the timeout above the WAL sender's expected idle period or enable TCP keepalives.
 
 ### Compute sizing
 
@@ -112,5 +113,5 @@ The Rust Drasi service has a smaller memory footprint than the Node equivalent i
 
 ## References
 
-- `execution-ledger/README.md` — Runtime behavior note (Drasi WAL reader)
-- `execution-ledger/Cargo.toml` — `[workspace.dependencies]` entry pinning `drasi-source-postgres` to `0.2.7`
+- `execution-ledger/README.md`: Runtime behavior note (Drasi WAL reader)
+- `execution-ledger/Cargo.toml`: `[workspace.dependencies]` entry pinning `drasi-source-postgres` to `0.2.7`

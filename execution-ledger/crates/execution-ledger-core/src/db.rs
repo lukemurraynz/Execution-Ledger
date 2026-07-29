@@ -700,3 +700,136 @@ pub async fn list_schedules(pool: &PgPool, limit: i64) -> Result<Vec<serde_json:
     })?;
     Ok(rows.into_iter().map(|(v,)| v).collect())
 }
+
+// ── Batch-window aggregation primitive ───────────────────────────────────
+
+/// Row shape returned by [`batch_window_add_item`] — enough for a connector
+/// to report back what state the window is in without a second round trip.
+#[derive(Debug, Clone)]
+pub struct BatchWindowRow {
+    pub id: Uuid,
+    pub window_key: String,
+    pub job_id: String,
+    pub tenant_id: Option<Uuid>,
+    pub item_count: i32,
+    pub expected_count: Option<i32>,
+    pub window_ends_at: DateTime<Utc>,
+    pub status: String,
+}
+
+pub struct BatchWindowAddItemSpec<'a> {
+    pub window_key: &'a str,
+    pub job_id: &'a str,
+    pub tenant_id: Option<Uuid>,
+    pub window_minutes: i32,
+    pub expected_count: Option<i32>,
+    pub item: &'a Value,
+}
+
+/// Upserts an arrival into the open batch window for `window_key`.
+///
+/// First arrival for a `window_key` opens a new window with
+/// `window_ends_at = now() + window_minutes` (or `now()` immediately if
+/// `expected_count` is already satisfied by this single item). Subsequent
+/// arrivals append to the same open row and pull `window_ends_at` forward to
+/// `now()` the moment `expected_count` is reached — adaptive early release
+/// instead of always blocking the full window, while still defaulting
+/// safely to timer-only behavior when the count isn't known upfront.
+pub async fn batch_window_add_item(
+    pool: &PgPool,
+    spec: &BatchWindowAddItemSpec<'_>,
+) -> Result<BatchWindowRow> {
+    let row = sqlx::query_as::<
+        _,
+        (Uuid, String, String, Option<Uuid>, i32, Option<i32>, DateTime<Utc>, String),
+    >(
+        "INSERT INTO EXECUTION_LEDGER_batch_windows
+            (window_key, job_id, tenant_id, window_minutes, expected_count,
+             item_count, items, first_arrival_at, window_ends_at, status)
+         VALUES
+            ($1, $2, $3, $4, $5, 1, jsonb_build_array($6), now(),
+             CASE WHEN $5 IS NOT NULL AND $5 <= 1 THEN now()
+                  ELSE now() + make_interval(mins => $4) END,
+             'open')
+         ON CONFLICT (window_key) WHERE status = 'open' DO UPDATE SET
+            items = EXECUTION_LEDGER_batch_windows.items || jsonb_build_array($6),
+            item_count = EXECUTION_LEDGER_batch_windows.item_count + 1,
+            window_ends_at = CASE
+                WHEN EXECUTION_LEDGER_batch_windows.expected_count IS NOT NULL
+                     AND (EXECUTION_LEDGER_batch_windows.item_count + 1)
+                         >= EXECUTION_LEDGER_batch_windows.expected_count
+                THEN now()
+                ELSE EXECUTION_LEDGER_batch_windows.window_ends_at
+            END,
+            updated_at = now()
+         RETURNING id, window_key, job_id, tenant_id, item_count, expected_count,
+                   window_ends_at, status",
+    )
+    .bind(spec.window_key)
+    .bind(spec.job_id)
+    .bind(spec.tenant_id)
+    .bind(spec.window_minutes)
+    .bind(spec.expected_count)
+    .bind(spec.item)
+    .fetch_one(pool)
+    .await
+    .map_err(|source| ExecutionLedgerError::DependencyFailed {
+        dependency: "postgres",
+        source: Box::new(source),
+    })?;
+
+    Ok(BatchWindowRow {
+        id: row.0,
+        window_key: row.1,
+        job_id: row.2,
+        tenant_id: row.3,
+        item_count: row.4,
+        expected_count: row.5,
+        window_ends_at: row.6,
+        status: row.7,
+    })
+}
+
+/// Row shape returned by [`batch_window_release`] — carries the collected
+/// items so the caller can trigger the aggregate job without a second query.
+#[derive(Debug, Clone)]
+pub struct BatchWindowReleaseRow {
+    pub id: Uuid,
+    pub window_key: String,
+    pub job_id: String,
+    pub tenant_id: Option<Uuid>,
+    pub items: Value,
+}
+
+/// Marks an open batch window `released` and returns its collected items.
+///
+/// Returns `Ok(None)` if the window was already released (or doesn't
+/// exist) — the `WHERE status = 'open'` guard makes this idempotent under
+/// Drasi's at-least-once reaction delivery, so a duplicate `due` webhook
+/// call doesn't double-trigger the aggregate job.
+pub async fn batch_window_release(
+    pool: &PgPool,
+    window_id: Uuid,
+) -> Result<Option<BatchWindowReleaseRow>> {
+    let row = sqlx::query_as::<_, (Uuid, String, String, Option<Uuid>, Value)>(
+        "UPDATE EXECUTION_LEDGER_batch_windows
+         SET status = 'released', released_at = now(), updated_at = now()
+         WHERE id = $1 AND status = 'open'
+         RETURNING id, window_key, job_id, tenant_id, items",
+    )
+    .bind(window_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|source| ExecutionLedgerError::DependencyFailed {
+        dependency: "postgres",
+        source: Box::new(source),
+    })?;
+
+    Ok(row.map(|(id, window_key, job_id, tenant_id, items)| BatchWindowReleaseRow {
+        id,
+        window_key,
+        job_id,
+        tenant_id,
+        items,
+    }))
+}

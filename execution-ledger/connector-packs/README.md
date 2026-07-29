@@ -64,7 +64,7 @@ Use `example-finance-settlement-pack` as the baseline pattern for new packs.
 
 ## Adding a new connector
 
-If none of the existing connectors (`platform_health`, `rest`, `ms_graph_notify`, `queue`, `azure_blob`, `sftp`, `erp`, `azure_compute`, `azure_sql`, `transform`, `pgp`, `blob_archive`, `http_download`) fit your integration, you can add a new connector to the core runtime.
+If none of the existing connectors (`platform_health`, `rest`, `ms_graph_notify`, `queue`, `azure_blob`, `sftp`, `ftp`, `erp`, `azure_compute`, `azure_sql`, `transform`, `pgp`, `blob_archive`, `http_download`, `batch_window`) fit your integration, you can add a new connector to the core runtime.
 
 ### Step 1: Add the variant
 
@@ -87,6 +87,8 @@ pub enum ConnectorKind {
     Pgp,
     BlobArchive,
     HttpDownload,
+    Ftp,
+    BatchWindow,
     MyNewConnector, // <-- add here
 }
 ```
@@ -108,7 +110,7 @@ use crate::connectors::helpers::step_config_string;
 ///
 /// | Key | Required | Default | Notes |
 /// |-----|----------|---------|-------|
-/// | `apiKey` | yes | — | API key for the external service |
+/// | `apiKey` | yes | N/A | API key for the external service |
 /// | `endpoint` | no | `https://api.example.com` | Base URL |
 ///
 /// ## Fail-closed behavior
@@ -153,6 +155,7 @@ match step.connector {
 ### Step 4: Document it
 
 Add a doc comment to the module explaining:
+
 - What the connector does
 - Required and optional configuration keys
 - Fail-closed behavior (what happens when config is missing or the call fails)
@@ -194,18 +197,18 @@ Execution Ledger connectors use `ManagedIdentityCredential` from `azure_identity
 
 ### How it works
 
-Each Azure connector reads `AZURE_MANAGED_IDENTITY_CLIENT_ID` at token acquisition time. Set this to the client ID of the UAMI you want that connector pack to use. The worker reads the env var from App Configuration at runtime — no code changes needed when you switch UAMIs.
+Each Azure connector reads `AZURE_MANAGED_IDENTITY_CLIENT_ID` at token acquisition time. Set this to the client ID of the UAMI you want that connector pack to use. The worker reads the env var from App Configuration at runtime, with no code changes needed when you switch UAMIs.
 
 ### App Configuration key naming
 
 Use a pack-specific prefix so each connector pack can reference its own UAMI:
 
-| Pack | Env var | App Configuration key |
-|------|---------|---------------------|
+| Pack                  | Env var                      | App Configuration key                         |
+| --------------------- | ---------------------------- | --------------------------------------------- |
 | `azure-compute-scale` | `AZURE_COMPUTE_MI_CLIENT_ID` | `execution-ledger:AZURE_COMPUTE_MI_CLIENT_ID` |
-| `azure-sql-scale` | `AZURE_SQL_MI_CLIENT_ID` | `execution-ledger:AZURE_SQL_MI_CLIENT_ID` |
+| `azure-sql-scale`     | `AZURE_SQL_MI_CLIENT_ID`     | `execution-ledger:AZURE_SQL_MI_CLIENT_ID`     |
 
-Set these as non-secret values in App Configuration — only the client ID (a GUID) is exposed, not the actual credential.
+Set these as non-secret values in App Configuration. Only the client ID (a GUID) is exposed, not the actual credential.
 
 ### Per-pack UAMI setup
 
@@ -254,8 +257,16 @@ az appconfig kv set \
 ```json
 {
   "requiredConfig": {
-    "azure_compute": ["AZURE_SUBSCRIPTION_ID", "AZURE_RESOURCE_GROUP", "AZURE_COMPUTE_MI_CLIENT_ID"],
-    "azure_sql": ["AZURE_SUBSCRIPTION_ID", "AZURE_RESOURCE_GROUP", "AZURE_SQL_MI_CLIENT_ID"]
+    "azure_compute": [
+      "AZURE_SUBSCRIPTION_ID",
+      "AZURE_RESOURCE_GROUP",
+      "AZURE_COMPUTE_MI_CLIENT_ID"
+    ],
+    "azure_sql": [
+      "AZURE_SUBSCRIPTION_ID",
+      "AZURE_RESOURCE_GROUP",
+      "AZURE_SQL_MI_CLIENT_ID"
+    ]
   }
 }
 ```

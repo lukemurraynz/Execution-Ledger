@@ -1,4 +1,4 @@
-# Azure SQL Scale Pack — Operational Runbook
+# Azure SQL Scale Pack: Operational Runbook
 
 ## Overview
 
@@ -8,20 +8,20 @@ Scales Azure SQL Database (DTU and vCore) and SQL Elastic Pool resources on cron
 
 Each connector pack gets its own UAMI with only the roles it needs. This limits blast radius: if a step is exploited, the attacker can only touch the resources the pack's UAMI has RBAC access to.
 
-The azure-sql-scale UAMI needs these roles at **resource group scope** — not subscription:
+The azure-sql-scale UAMI needs these roles at **resource group scope**, not subscription:
 
-| Role | Why |
-|------|-----|
-| `SQL Server Contributor` | PATCH to database and elastic pool resources |
-| `Reader` | Read current SKU and license type before resize |
+| Role                     | Why                                             |
+| ------------------------ | ----------------------------------------------- |
+| `SQL Server Contributor` | PATCH to database and elastic pool resources    |
+| `Reader`                 | Read current SKU and license type before resize |
 
-Do NOT grant at subscription level. Do NOT reuse a shared worker MSI — use a dedicated UAMI per pack.
+Do NOT grant at subscription level. Do NOT reuse a shared worker MSI; use a dedicated UAMI per pack.
 
 ## Managed Identity Setup
 
 Create a **dedicated UAMI for this pack** with only the roles SQL scale operations need. Do not reuse a shared worker MSI.
 
-### Step 1 — Create the UAMI
+### Step 1: Create the UAMI
 
 ```bash
 az identity create \
@@ -35,14 +35,14 @@ AZURE_SQL_MI_CLIENT_ID=$(az identity show \
   --query clientId -o tsv)
 ```
 
-### Step 2 — Assign only SQL-level roles
+### Step 2: Assign only SQL-level roles
 
-| Role | Scope | Why |
-|------|-------|-----|
-| `SQL Server Contributor` | Target RG | PATCH database and elastic pool resources |
-| `Reader` | Target RG | Read current SKU and license type before resize |
+| Role                     | Scope     | Why                                             |
+| ------------------------ | --------- | ----------------------------------------------- |
+| `SQL Server Contributor` | Target RG | PATCH database and elastic pool resources       |
+| `Reader`                 | Target RG | Read current SKU and license type before resize |
 
-Grant at RG scope only — not subscription. Do NOT use `SQL Server Contributor` at subscription level.
+Grant at RG scope only, not subscription. Do NOT use `SQL Server Contributor` at subscription level.
 
 ```bash
 az role assignment create \
@@ -56,7 +56,7 @@ az role assignment create \
   --scope "/subscriptions/<sub>/resourceGroups/<rg>"
 ```
 
-### Step 3 — Store client ID in App Configuration
+### Step 3: Store client ID in App Configuration
 
 ```bash
 az appconfig kv set \
@@ -66,7 +66,7 @@ az appconfig kv set \
   --subscription <sub>
 ```
 
-### Step 4 — Reference in pack.json
+### Step 4: Reference in pack.json
 
 ```json
 {
@@ -84,29 +84,29 @@ az appconfig kv set \
 
 ## Required Environment Variables
 
-| Variable | Source | Notes |
-|----------|--------|-------|
-| `AZURE_SUBSCRIPTION_ID` | Platform config | Subscription containing the SQL Server |
-| `AZURE_RESOURCE_GROUP` | Platform config | RG containing the SQL Server |
-| `SQL_SERVER_NAME` | Per-job | Short server name (not FQDN) |
-| `SQL_DATABASE_NAME` | Per-job | Target database name |
-| `SQL_RESTORE_SKU_NAME` | Per-job | SKU to restore on scale-up, e.g. `S2` |
-| `SQL_RESTORE_SKU_TIER` | Per-job | Tier to restore, e.g. `Standard` |
-| `SQL_RESTORE_CAPACITY` | Per-job | DTU count to restore |
-| `SQL_RESTORE_LICENSE_TYPE` | Per-job | `"BasePrice"` (Hybrid Benefit) or `"LicenseIncluded"` |
+| Variable                   | Source          | Notes                                                 |
+| -------------------------- | --------------- | ----------------------------------------------------- |
+| `AZURE_SUBSCRIPTION_ID`    | Platform config | Subscription containing the SQL Server                |
+| `AZURE_RESOURCE_GROUP`     | Platform config | RG containing the SQL Server                          |
+| `SQL_SERVER_NAME`          | Per-job         | Short server name (not FQDN)                          |
+| `SQL_DATABASE_NAME`        | Per-job         | Target database name                                  |
+| `SQL_RESTORE_SKU_NAME`     | Per-job         | SKU to restore on scale-up, e.g. `S2`                 |
+| `SQL_RESTORE_SKU_TIER`     | Per-job         | Tier to restore, e.g. `Standard`                      |
+| `SQL_RESTORE_CAPACITY`     | Per-job         | DTU count to restore                                  |
+| `SQL_RESTORE_LICENSE_TYPE` | Per-job         | `"BasePrice"` (Hybrid Benefit) or `"LicenseIncluded"` |
 
-## LicenseType — Hybrid Benefit Handling
+## LicenseType: Hybrid Benefit handling
 
 This is the most important configuration for SQL cost optimization.
 
 ### What is LicenseType?
 
-- `LicenseType = "BasePrice"` — Customer has Azure Hybrid Benefit (existing SQL Server licenses). Azure does NOT charge for the SQL Server license.
-- `LicenseType = "LicenseIncluded"` — SQL Server license is included in the database cost.
+- `LicenseType = "BasePrice"`: Customer has Azure Hybrid Benefit (existing SQL Server licenses). Azure does NOT charge for the SQL Server license.
+- `LicenseType = "LicenseIncluded"`: SQL Server license is included in the database cost.
 
 ### Why it matters on DTU ↔ vCore switches
 
-When you switch from DTU to vCore (or vice versa), Azure may not preserve `LicenseType` in the API response before the switch. If you don't capture and restore it explicitly, a database that had `BasePrice` (Hybrid Benefit) will silently be restored as `LicenseIncluded` — adding SQL Server license cost to every bill.
+When you switch from DTU to vCore (or vice versa), Azure may not preserve `LicenseType` in the API response before the switch. If you don't capture and restore it explicitly, a database that had `BasePrice` (Hybrid Benefit) will silently be restored as `LicenseIncluded`, adding SQL Server license cost to every bill.
 
 The `sql-database-get` step captures `licenseType` in its `stateBlob`. The reactive scale-down job includes `licenseType` in both `targetSku` and step `data` to ensure it is preserved across model switches.
 
@@ -122,6 +122,7 @@ AzureActivity
 ```
 
 Or via ARM CLI:
+
 ```bash
 az sql db show \
   --resource-group <rg> \
@@ -159,7 +160,7 @@ ExecutionLedger_CL
 | project TimeGenerated, ServerName_s, DatabaseName_s, ScaleEvents
 ```
 
-### KQL: Cooldown — skip if scaled in last 15 minutes
+### KQL: Cooldown; skip if scaled in last 15 minutes
 
 ```kql
 ExecutionLedger_CL
@@ -172,18 +173,18 @@ ExecutionLedger_CL
 
 ### DTU-based (Basic, Standard, Premium)
 
-| Tier | Lowest SKU | Highest SKU | Use case |
-|------|-----------|------------|----------|
-| Basic | B_BC_DTU5 | B_BC_DTU50 | Dev/test |
-| Standard | S0 | S12 | Prod bursty |
-| Premium | P1 | P15 | Consistent high load |
+| Tier     | Lowest SKU | Highest SKU | Use case             |
+| -------- | ---------- | ----------- | -------------------- |
+| Basic    | B_BC_DTU5  | B_BC_DTU50  | Dev/test             |
+| Standard | S0         | S12         | Prod bursty          |
+| Premium  | P1         | P15         | Consistent high load |
 
 ### vCore-based (GeneralPurpose, BusinessCritical)
 
-| Tier | Family examples | Use case |
-|------|-----------------|----------|
-| GeneralPurpose | GP_S_Gen5_1, GP_Gen5_80 | Most workloads |
-| BusinessCritical | BC_Gen5_2, BC_Gen5_64 | High IO, HA requirement |
+| Tier             | Family examples         | Use case                |
+| ---------------- | ----------------------- | ----------------------- |
+| GeneralPurpose   | GP_S_Gen5_1, GP_Gen5_80 | Most workloads          |
+| BusinessCritical | BC_Gen5_2, BC_Gen5_64   | High IO, HA requirement |
 
 ### Elastic Pool DTU
 

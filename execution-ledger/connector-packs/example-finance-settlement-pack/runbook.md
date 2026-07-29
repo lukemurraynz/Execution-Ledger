@@ -4,7 +4,7 @@
 
 This pack demonstrates how to package a customer-specific workflow contract outside the base runtime. It orchestrates a file-to-queue settlement flow: download a CSV from SFTP, archive it to blob storage, transform via ERP, and publish to Service Bus.
 
-**Step-to-step chaining**: the `sftp` connector's `download` action reads a remote file and returns its content in the step's own output (base64-encoded) — it never writes to the worker's local filesystem. The `archive-original-file` step demonstrates real chaining: its `azure_blob` config has no explicit `body`, so the connector automatically reads the prior step's output (`ctx.upstream_output`), decodes it, and uploads the original file bytes. This is the only connector pair with automatic content-forwarding today — the ERP step below does not automatically receive the settlement file; it sends its own explicit JSON payload. If your ERP integration needs the raw file content, pass it explicitly in that step's `data.body` (e.g. templated from a prior step's output by your job-orchestration tooling) rather than relying on implicit chaining.
+**Step-to-step chaining**: the `sftp` connector's `download` action reads a remote file and returns its content in the step's own output (base64-encoded). It never writes to the worker's local filesystem. The `archive-original-file` step demonstrates real chaining: its `azure_blob` config has no explicit `body`, so the connector automatically reads the prior step's output (`ctx.upstream_output`), decodes it, and uploads the original file bytes. This is the only connector pair with automatic content-forwarding today. The ERP step below does not automatically receive the settlement file; it sends its own explicit JSON payload. If your ERP integration needs the raw file content, pass it explicitly in that step's `data.body` (for example templated from a prior step's output by your job-orchestration tooling) rather than relying on implicit chaining.
 
 ## Included job template
 
@@ -14,14 +14,14 @@ This pack demonstrates how to package a customer-specific workflow contract outs
 
 Before running this pack, ensure these variables are set in App Configuration or Container Apps:
 
-| Variable | Used by | Notes |
-|----------|---------|-------|
-| `EXECUTION_LEDGER_SFTP_HOST` | SFTP connector | SFTP server hostname |
-| `EXECUTION_LEDGER_SFTP_USERNAME` | SFTP connector | SSH username |
-| `EXECUTION_LEDGER_SFTP_PASSWORD` | SFTP connector | SSH password (or use `EXECUTION_LEDGER_SFTP_PRIVATE_KEY_PATH` for key auth) |
-| `EXECUTION_LEDGER_BLOB_DIR` | Blob connector | Local root directory for the archive step's filesystem provider (this example doesn't set a per-run `url`, so it uses the filesystem provider — see the `azure_blob` connector's module docs for the Azure Blob Storage URL-based path, which needs a per-run blob URL your job-launch tooling computes) |
-| `CONNECTOR_ERP_URL` | ERP connector | ERP transform endpoint URL |
-| `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE` | Queue connector | Service Bus namespace (managed identity must have send rights) |
+| Variable                                | Used by         | Notes                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EXECUTION_LEDGER_SFTP_HOST`            | SFTP connector  | SFTP server hostname                                                                                                                                                                                                                                                                                    |
+| `EXECUTION_LEDGER_SFTP_USERNAME`        | SFTP connector  | SSH username                                                                                                                                                                                                                                                                                            |
+| `EXECUTION_LEDGER_SFTP_PASSWORD`        | SFTP connector  | SSH password (or use `EXECUTION_LEDGER_SFTP_PRIVATE_KEY_PATH` for key auth)                                                                                                                                                                                                                             |
+| `EXECUTION_LEDGER_BLOB_DIR`             | Blob connector  | Local root directory for the archive step's filesystem provider (this example doesn't set a per-run `url`, so it uses the filesystem provider; see the `azure_blob` connector's module docs for the Azure Blob Storage URL-based path, which needs a per-run blob URL your job-launch tooling computes) |
+| `CONNECTOR_ERP_URL`                     | ERP connector   | ERP transform endpoint URL                                                                                                                                                                                                                                                                              |
+| `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE` | Queue connector | Service Bus namespace (managed identity must have send rights)                                                                                                                                                                                                                                          |
 
 ## Preflight checks before first run
 
@@ -36,7 +36,7 @@ Before running this pack, ensure these variables are set in App Configuration or
 Run from `execution-ledger/`:
 
 ```bash
-# Minimal launch (platform health check only — useful for validating connectivity)
+# Minimal launch (platform health check only; useful for validating connectivity)
 cargo run -p execution-ledger-cli -- job-launch <tenant-id> finance.settlement.file-to-queue '{"steps":[{"id":"platform-health-gate","connector":"platform_health"}]}'
 
 # Full launch with all steps (requires external config to be set)
@@ -71,6 +71,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** SFTP server unreachable from worker environment.
 
 **Fix:**
+
 1. Check `EXECUTION_LEDGER_SFTP_HOST` and port are correct.
 1. Verify network path: worker → VNet → private endpoint / public endpoint.
 1. Test connectivity: `kubectl exec` into a worker pod and run `nc -zv <host> 22`.
@@ -83,6 +84,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Invalid credentials or key configuration.
 
 **Fix:**
+
 1. Verify `EXECUTION_LEDGER_SFTP_USERNAME` and `EXECUTION_LEDGER_SFTP_PASSWORD` (or `EXECUTION_LEDGER_SFTP_PRIVATE_KEY_PATH`) are correct.
 1. If using key auth, confirm the private key is mounted or accessible from the worker.
 1. Replay the step after fixing credentials.
@@ -94,6 +96,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** The `settlement-archive` container doesn't exist, or the worker's managed identity lacks `Storage Blob Data Contributor`.
 
 **Fix:**
+
 1. Create the container if it doesn't exist.
 1. Confirm the managed identity has the `Storage Blob Data Contributor` role on the storage account.
 1. Replay the step: `cargo run -p execution-ledger-cli -- job-replay <tenant-id> <run-id> archive-original-file`
@@ -105,6 +108,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** ERP endpoint rejected the request payload.
 
 **Fix:**
+
 1. Inspect the step output: `GET /platform/jobs/{id}/steps`. The `response` field contains the ERP error body.
 1. Adjust the step `data.body` to match the ERP's expected schema.
 1. Replay only the failed step: `cargo run -p execution-ledger-cli -- job-replay <tenant-id> <run-id> transform-ledger-records`
@@ -116,6 +120,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Service Bus namespace not configured or not reachable.
 
 **Fix:**
+
 1. Confirm `EXECUTION_LEDGER_SERVICEBUS_NAMESPACE` is set in App Configuration.
 1. Confirm the worker's managed identity has `Azure Service Bus Data Sender` role.
 1. Replay the step after fixing configuration.
@@ -127,6 +132,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Cause:** Connection string was provided in config or environment. This is explicitly rejected.
 
 **Fix:**
+
 1. Remove any `EXECUTION_LEDGER_SERVICEBUS_CONNECTION_STRING` from environment and config.
 1. Ensure the worker is running with a managed identity that has Service Bus send rights.
 1. Replay the step.
@@ -136,6 +142,7 @@ curl -X POST https://<apim-gateway>/platform/jobs/trigger \
 **Symptom:** Run appears stuck in "running" state with no step progress.
 
 **Fix:**
+
 ```bash
 # Release stale leases
 cargo run -p execution-ledger-cli -- recovery-runs
@@ -150,6 +157,7 @@ curl -X POST https://<apim-gateway>/platform/recovery/runs?limit=100 \
 **Symptom:** Intent appears in poison/dead-letter queue after multiple failures.
 
 **Fix:**
+
 ```bash
 # Drain poison messages
 cargo run -p execution-ledger-cli -- recovery-servicebus-poison

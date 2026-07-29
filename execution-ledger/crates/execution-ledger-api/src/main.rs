@@ -212,6 +212,14 @@ fn build_router(state: AppState) -> Router {
             "/platform/internal/schedules/due",
             post(routes::schedules::internal_schedules_due),
         )
+        .route(
+            "/platform/internal/batch-windows/add-item",
+            post(routes::batch_windows::internal_add_item),
+        )
+        .route(
+            "/platform/internal/batch-windows/due",
+            post(routes::batch_windows::internal_batch_windows_due),
+        )
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             require_internal_service,
@@ -232,7 +240,7 @@ fn build_router(state: AppState) -> Router {
 }
 
 async fn shutdown_signal() {
-    // SIGTERM-only shutdown; add SIGINT/other signals if this ever
+    // ponytail: SIGTERM-only shutdown; add SIGINT/other signals if this ever
     // runs outside a container orchestrator that sends SIGTERM.
     let _ = tokio::signal::ctrl_c().await;
 }

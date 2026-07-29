@@ -4,6 +4,7 @@
 //! do not carry bearer tokens.
 //! `/platform/gc` requires `platform:write` scope (enforced by router layer).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Json;
@@ -11,13 +12,21 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use execution_ledger_core::observability;
 use execution_ledger_domain::platform::HealthReport;
-use execution_ledger_domain::platform::health_report;
+use execution_ledger_domain::platform::{degraded_health_report, health_report};
 use serde::Serialize;
 
 use crate::AppState;
 
+const DRASI_HEARTBEAT_KEY: &str = "drasi:heartbeat";
+
 /// Real database health check — mirrors `health.route.ts`'s dependency
-/// probe rather than returning a static "ok".
+/// probe rather than returning a static "ok". Also reports `degraded`
+/// (still HTTP 200 — the API itself is serving fine) when Drasi's
+/// `drasi:heartbeat` KV entry has expired, so a fully-down Drasi process is
+/// visible here instead of failing silently. The TTL on that entry (see
+/// `execution-ledger-drasi::spawn_heartbeat_writer`) is the staleness
+/// signal — `kv_get` returning `None` already means "expired or never
+/// written," no timestamp comparison needed on this side.
 pub(crate) async fn health(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<HealthReport>, StatusCode> {
@@ -29,7 +38,23 @@ pub(crate) async fn health(
             StatusCode::SERVICE_UNAVAILABLE
         })?;
 
-    Ok(Json(health_report(&state.environment)))
+    let drasi_heartbeat = execution_ledger_core::db::kv_get(&state.pool, DRASI_HEARTBEAT_KEY)
+        .await
+        .unwrap_or(None);
+
+    let report = if drasi_heartbeat.is_some() {
+        health_report(&state.environment)
+    } else {
+        let mut services = HashMap::new();
+        services.insert("drasi".to_string(), "stale".to_string());
+        degraded_health_report(
+            &state.environment,
+            services,
+            vec!["drasi: heartbeat missing or expired (no update in ~3m)".to_string()],
+        )
+    };
+
+    Ok(Json(report))
 }
 
 #[derive(Debug, Serialize)]

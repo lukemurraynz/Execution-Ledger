@@ -1,6 +1,6 @@
 # Contributing to Execution Ledger
 
-Thanks for considering a contribution. This project is a Rust multi-service backend for durable job orchestration on Azure — see [README.md](README.md) for what it does and how the pieces fit together.
+Thanks for considering a contribution. This project is a Rust multi-service backend for durable job orchestration on Azure; see [README.md](README.md) for what it does and how the pieces fit together.
 
 ## Before you start
 
@@ -8,15 +8,15 @@ For anything beyond a small, obvious fix (typos, a clearly broken doc example), 
 
 ## Development setup
 
-The fastest path to a working local environment is the devcontainer — see [Try it locally](README.md#try-it-locally-no-azure-account-needed) in the README. It provisions a local Postgres with the settings this project needs (including logical replication for the Drasi WAL reader) and wires the runtime environment variables.
+The fastest path to a working local environment is the devcontainer; see [Try it locally](README.md#try-it-locally-no-azure-account-needed) in the README. It provisions a local Postgres with the settings this project needs (including logical replication for the Drasi WAL reader) and wires the runtime environment variables.
 
 ## Making a change
 
 1. Fork the repository and create a branch from `main`.
-2. Keep changes focused — a PR should do one thing. Unrelated cleanup, formatting sweeps, or refactors belong in a separate PR.
+2. Keep changes focused. A PR should do one thing. Unrelated cleanup, formatting sweeps, or refactors belong in a separate PR.
 3. Follow the existing code's conventions, error-handling patterns, and doc-comment style rather than introducing a new one.
 4. Add or update tests for any behavior change. See [`crates/execution-ledger-domain/src/connectors/`](crates/execution-ledger-domain/src/connectors/) for the established test pattern: validation branches and no-op/compensate branches are tested directly (no mocking needed since they return before any network call); tests that exercise the actual behavior under test use `-> Result<(), E>` + `?` or a `matches!`/`map_or_else` comparison rather than `.unwrap()`.
-5. Update documentation when behavior, configuration, or connector contracts change — including the relevant `connector-packs/*/runbook.md` if a connector pack is affected.
+5. Update documentation when behavior, configuration, or connector contracts change, including the relevant `connector-packs/*/runbook.md` if a connector pack is affected.
 
 ## Before opening a pull request
 
@@ -28,7 +28,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The workspace denies `unwrap()`, `expect()`, and `panic!()` outside item-level `#[allow(...)]` exceptions that carry a reason comment. An allowance is only appropriate over a provably infallible, literal construction (a hardcoded test fixture, a literal well-formed URL) — never over the actual `Result`/`Option` a test exists to exercise, and never at module or crate scope. Ask in your PR if unsure.
+The workspace denies `unwrap()`, `expect()`, and `panic!()` outside item-level `#[allow(...)]` exceptions that carry a reason comment. An allowance is only appropriate over a provably infallible, literal construction (a hardcoded test fixture, a literal well-formed URL), never over the actual `Result`/`Option` a test exists to exercise, and never at module or crate scope. Ask in your PR if unsure.
 
 ## Adding a connector
 
