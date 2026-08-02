@@ -1,6 +1,23 @@
 #Requires -Version 7.6
 #Requires -PSEdition Core
 
+<#
+.SYNOPSIS
+    Executes a guarded PostgreSQL Flexible Server fault (restart or failover) with
+    pre/post validation checks.
+
+.DESCRIPTION
+    Restarts or fails over an Azure PostgreSQL Flexible Server with bounded pre-check
+    (current state validation) and post-check (replica health, replication lag, and
+    connectivity) steps. Passes only when the server returns to a healthy state within
+    the configured timeout. Does not proceed unless the server is in a Ready state
+    before the fault.
+
+.EXAMPLE
+    .\Invoke-PostgresFlexibleServerFault.ps1 -ResourceGroupName "rg-executionledger-prod" `
+        -ServerName "pg-executionledger-prod" -FaultMode Restart
+#>
+
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Mandatory)]

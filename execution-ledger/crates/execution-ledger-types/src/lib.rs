@@ -1,3 +1,11 @@
+//! Shared types, serialization contracts, and validation logic used by every
+//! Execution Ledger crate.
+//!
+//! This crate defines the wire format for intents and messages, the validation
+//! rules that apply at the platform boundary, and the error type for envelope
+//! validation failures. It has no dependencies on infrastructure crates
+//! (sqlx, reqwest, drasi-lib) — only data modelling and serde.
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

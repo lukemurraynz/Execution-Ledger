@@ -6,6 +6,10 @@ members = ["crates/*"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
+description = "Durable job orchestration for Azure with step-level idempotency, replay, and compensate controls."
+repository = "https://github.com/lukemurraynz/Execution-Ledger"
+homepage = "https://github.com/lukemurraynz/Execution-Ledger"
+documentation = "https://github.com/lukemurraynz/Execution-Ledger"
 
 [workspace.dependencies]
 anyhow = "1"

@@ -1,10 +1,9 @@
-//! `apps/scheduler` equivalent: a timer tick that emits job-launch intents.
+//! Scheduler: a timer tick that emits job-launch intents for due schedules.
 //!
-//! `apps/scheduler` today runs as an Azure Functions timer trigger; Azure
-//! Durable Functions has no Rust support, so this is a plain `tokio::time`
-//! interval loop instead of a hosted Functions binding. Deploy as a
-//! long-running container/service rather than an Azure Functions custom
-//! handler.
+//! Runs on a `tokio::time` interval loop. Claims due schedules with
+//! `FOR UPDATE SKIP LOCKED`, enqueues intents directly to Service Bus
+//! (or the local queue table), and advances `next_run` from cron expressions.
+//! Deploy as a long-running container/service.
 
 use execution_ledger_core::{
     ExecutionLedgerConfig, ExecutionLedgerIntent, ExecutionLedgerIntentSource, QueueEngine, db,

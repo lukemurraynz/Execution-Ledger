@@ -180,7 +180,7 @@ fn parse_xml_to_json(xml: &str) -> Result<Value, ExecutionLedgerError> {
                 close_xml_element(&mut stack, &mut root, tag, value);
             }
             Ok(Event::Text(text)) => {
-                let decoded = text.unescape().map_err(|source| xml_error(source.to_string()))?;
+                let decoded = String::from_utf8_lossy(text.as_ref()).into_owned();
                 if let Some(frame) = stack.last_mut() {
                     frame.text.push_str(decoded.trim());
                 }

@@ -12,10 +12,10 @@
 //!   `rest` (get a downloadable URL) → `http_download` → `azure_blob`
 //!   (upload) or `blob_archive` (unzip).
 //! - **`upload`**: PUTs bytes to an arbitrary URL (e.g. a writable SAS URL).
-//!   Sends `x-ms-blob-type: BlockBlob` by default because the D365 DMF pack
-//!   this action was built for uploads to Azure Blob SAS URLs, which reject
-//!   a plain PUT with `MissingRequiredHeader` otherwise; override or clear it
-//!   via `blobTypeHeader` if the target isn't Azure Blob. Chain it as
+//!   Sends `x-ms-blob-type: BlockBlob` by default because Azure Blob SAS URL
+//!   uploads reject a plain PUT with `MissingRequiredHeader` otherwise;
+//!   override or clear it via `blobTypeHeader` if the target isn't Azure Blob.
+//!   Chain it as
 //!   `blob_archive` (zip) → `http_download` (`upload`).
 //!
 //! ## Configuration
@@ -35,8 +35,8 @@
 //! 1. A top-level `url` field (e.g. from a custom connector's output).
 //! 2. `response.value` — the shape `rest`/`erp` steps produce, where the
 //!    external API's own response body sits at `response` and the field of
-//!    interest (a download URL, in the D365 DMF pack this connector was
-//!    built for) is `value`.
+//!    interest (typically a download URL returned by an upstream API call) is
+//!    `value`.
 //!
 //! This lets `erp` (get a downloadable URL) → `http_download` chain directly
 //! without an intermediate step.

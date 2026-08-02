@@ -1,7 +1,6 @@
 //! Batch-window aggregation connector.
 //!
-//! Reusable equivalent of `BizTalk`'s long-running-orchestration correlation
-//! timer: correlates arrivals sharing a `windowKey` (e.g.
+//! Correlates arrivals sharing a `windowKey` (e.g.
 //! `"farmlands:branch-014"`) into one open window, then a Drasi continuous
 //! query (`due-batch-windows` in `drasi.yaml`) fires the moment the window
 //! closes — either the configured time elapses, or `expectedCount` arrivals

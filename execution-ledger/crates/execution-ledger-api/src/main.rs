@@ -1,15 +1,13 @@
-//! `apps/api` equivalent: HTTP transport and route registration.
+//! Axum HTTP API — route registration and application entrypoint.
 //!
-//! Real routes backed by real Postgres queries against `EXECUTION_LEDGER_jobs_runs` —
-//! mirroring `apps/api/src/routes/platform/health.route.ts` and
-//! `apps/api/src/routes/jobs.route.ts`. No in-memory stub data: `/health`
-//! fails if the database is unreachable, and `/jobs/:id` 404s on a real
-//! `SELECT` returning no rows.
+//! Real routes backed by real Postgres queries against `EXECUTION_LEDGER_jobs_runs`.
+//! No in-memory stub data: `/health` fails if the database is unreachable, and
+//! `/jobs/:id` 404s on a real `SELECT` returning no rows.
 //!
 //! Every route except `/health` requires a bearer token issued by
 //! Microsoft Entra ID, for a tenant that is onboarded and active in
-//! `EXECUTION_LEDGER_tenants` (see `execution_ledger_core::auth` and `require_authenticated_tenant`
-//! below) — this is the API's multi-tenancy boundary.
+//! `EXECUTION_LEDGER_tenants` (see `execution_ledger_core::auth` and
+//! `require_authenticated_tenant` below) — this is the API's multi-tenancy boundary.
 
 mod auth;
 mod mcp;

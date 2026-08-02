@@ -1,3 +1,16 @@
+//! Authentication and authorization middleware for the Execution Ledger API.
+//!
+//! Every request (except `/health`) passes through one of the auth middleware
+//! layers, which validate Microsoft Entra ID bearer tokens and extract the
+//! authenticated tenant and permitted scopes. Route handlers then enforce
+//! scope requirements at the handler level — tenant-scoped endpoints check
+//! `jobs:read:own` / `jobs:write:own`, platform endpoints check
+//! `platform:read` / `platform:write`, and MCP endpoints check `mcp:execute`.
+//!
+//! Internal-service endpoints (Drasi-to-API callbacks) are secured with a
+//! shared gateway secret injected by Azure API Management rather than a
+//! user-facing bearer token.
+
 use std::sync::Arc;
 
 use axum::extract::State;

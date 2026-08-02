@@ -1,6 +1,22 @@
 #Requires -Version 7.6
 #Requires -PSEdition Core
 
+<#
+.SYNOPSIS
+    Validates Execution Ledger deployment capacity and cost against acceptance gates.
+
+.DESCRIPTION
+    Checks Container App replica counts, PostgreSQL SKU, Service Bus tier, and other
+    resource dimensions against defined capacity and cost thresholds. Produces a
+    pass/fail gate result suitable for CI/CD deployment pipelines and operational
+    proof harness integration.
+
+.EXAMPLE
+    .\Invoke-CapacityCostGate.ps1 -ResourceGroupName "rg-executionledger-prod" `
+        -ContainerAppApiName "api" -ContainerAppWorkerName "worker" `
+        -ContainerAppSchedulerName "scheduler" -ServiceBusNamespaceName "sbns-prod"
+#>
+
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Mandatory)]

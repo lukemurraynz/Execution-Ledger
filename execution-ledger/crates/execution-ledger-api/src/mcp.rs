@@ -1,3 +1,12 @@
+//! Model Context Protocol (MCP) endpoint — serves the JSON-RPC 2.0 API at
+//! `/api/mcp/server` for AI copilots, Foundry agents, and MCP-compatible
+//! tools.
+//!
+//! Implements the 2025-11-25 protocol version with streamable HTTP transport.
+//! Tools are scope-gated: `tools/list` returns only tools the caller's token
+//! entitles them to use. All tools return standard JSON-RPC 2.0 responses
+//! with MCP error codes.
+
 use std::sync::Arc;
 
 use axum::Json;

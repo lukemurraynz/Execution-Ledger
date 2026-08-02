@@ -1,3 +1,10 @@
+//! Execution Ledger CLI — the operational command-line tool for managing
+//! runs, schedules, recovery, garbage collection, and job launch.
+//!
+//! Supports both `local` (in-database queue) and `servicebus` queue engines.
+//! All commands that touch the database or Service Bus require the standard
+//! bootstrap environment variables.
+
 use anyhow::{Context, bail};
 use chrono::Utc;
 use execution_ledger_core::{

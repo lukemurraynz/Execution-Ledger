@@ -1,6 +1,24 @@
 #Requires -Version 7.6
 #Requires -PSEdition Core
 
+<#
+.SYNOPSIS
+    Runs the Execution Ledger operational proof harness across baseline, soak, chaos,
+    and collect stages against a deployed environment.
+
+.DESCRIPTION
+    Validates deployment health by executing staged operational checks: baseline
+    precondition validation, soak load testing, chaos fault injection (Service Bus
+    queue-state disruption via Azure Chaos Studio), and evidence collection. Exits
+    with overallStatus=Succeeded only when all stages pass. Optionally invokes a
+    bounded PostgreSQL restart/failover fault.
+
+.EXAMPLE
+    .\Invoke-OperationalProofRun.ps1 -ResourceGroupName "rg-executionledger-prod" `
+        -ContainerAppApiName "api" -ContainerAppWorkerName "worker" `
+        -ContainerAppSchedulerName "scheduler" -ServiceBusNamespaceName "sbns-prod"
+#>
+
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [string[]]$Stages = @('baseline', 'soak', 'chaos', 'collect'),

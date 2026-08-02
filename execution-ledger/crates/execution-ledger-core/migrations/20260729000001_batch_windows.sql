@@ -1,8 +1,7 @@
 -- Batch-window aggregation primitive: correlates arrivals for a shared
 -- window_key (e.g. "farmlands:branch-014") over a configurable time window
 -- (or until an expected_count is reached), then releases the collected
--- items as a single job trigger. Reusable equivalent of BizTalk's
--- long-running-orchestration correlation timer.
+-- items as a single job trigger.
 CREATE TABLE IF NOT EXISTS EXECUTION_LEDGER_batch_windows (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID REFERENCES EXECUTION_LEDGER_tenants(id) ON DELETE SET NULL,

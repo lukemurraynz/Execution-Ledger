@@ -1,7 +1,7 @@
 //! Cross-runtime primitives shared by every Execution Ledger service.
 //!
-//! Mirrors `packages/core/src/shared` from the TypeScript implementation:
-//! configuration loading and the domain error type. Runtime-specific code
+//! Configuration loading, authentication, database bootstrap, error types,
+//! observability, offload, and queue abstraction. Runtime-specific code
 //! (API, worker, scheduler) lives in its own crate, not here.
 
 pub mod auth;

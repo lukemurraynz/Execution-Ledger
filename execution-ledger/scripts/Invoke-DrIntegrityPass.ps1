@@ -1,6 +1,23 @@
 #Requires -Version 7.6
 #Requires -PSEdition Core
 
+<#
+.SYNOPSIS
+    Runs unattended DR-integrity evidence collection against deployed Execution Ledger
+    resources and validates baseline preconditions.
+
+.DESCRIPTION
+    Collects DR-integrity pass/fail evidence by checking baseline preconditions from a
+    prior operational-proof run against the current environment state. Fails closed
+    when any invariant is Fail or Blocked. Outputs structured evidence to an artifacts
+    directory for audit and compliance review.
+
+.EXAMPLE
+    .\Invoke-DrIntegrityPass.ps1 -ResourceGroupName "rg-executionledger-prod" `
+        -ContainerAppApiName "api" -ContainerAppWorkerName "worker" `
+        -ContainerAppSchedulerName "scheduler" -ServiceBusNamespaceName "sbns-prod"
+#>
+
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [ValidateNotNullOrWhiteSpace()]
